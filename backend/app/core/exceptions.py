@@ -71,6 +71,32 @@ class LowRetrievalConfidenceError(YavuraBaseException):
     pass
 
 
+# Phase 4 Agent & Conversation Exceptions
+class AgentNotFoundError(EntityNotFoundError):
+    """Raised when agent is not found within tenant."""
+    pass
+
+
+class InactiveAgentExecutionError(YavuraBaseException):
+    """Raised when attempting to execute an inactive or archived agent."""
+    pass
+
+
+class ConversationNotFoundError(EntityNotFoundError):
+    """Raised when conversation is not found within tenant."""
+    pass
+
+
+class IdempotencyConflictError(YavuraBaseException):
+    """Raised when an idempotency key is reused with a differing payload."""
+    pass
+
+
+class LLMProviderError(YavuraBaseException):
+    """Raised when LLM provider returns an error, timeout, or invalid output."""
+    pass
+
+
 def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
     """Maps domain exceptions to appropriate HTTPExceptions."""
     if isinstance(exc, TenantIsolationError):
@@ -92,6 +118,21 @@ def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "PASSWORD_POLICY_VIOLATION", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, InactiveAgentExecutionError):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "INACTIVE_AGENT", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, IdempotencyConflictError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "IDEMPOTENCY_CONFLICT", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, LLMProviderError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "LLM_PROVIDER_ERROR", "message": exc.message, "details": exc.details},
         )
     elif isinstance(exc, EntityNotFoundError):
         return HTTPException(

@@ -164,6 +164,32 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
 
+    # Agent & Conversation Runtime Settings (Phase 4)
+    DEFAULT_LLM_PROVIDER: str = Field(
+        default="mock",
+        description="Active LLM provider for conversational runtime: mock, openai, etc.",
+    )
+    DEFAULT_LLM_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description="Default LLM model name for agent conversational turns",
+    )
+    MAX_CONVERSATION_HISTORY_MESSAGES: int = Field(
+        default=20,
+        description="Maximum recent conversation messages included in LLM context",
+    )
+    MAX_CONVERSATION_MESSAGE_CHARS: int = Field(
+        default=4000,
+        description="Maximum allowed characters for a single user utterance/message",
+    )
+    CONVERSATION_IDEMPOTENCY_EXPIRE_HOURS: int = Field(
+        default=24,
+        description="Hours before idempotency keys expire",
+    )
+    CONVERSATION_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=60,
+        description="Maximum conversational execution turns allowed per tenant/user per minute",
+    )
+
     @model_validator(mode="after")
     def validate_knowledge_and_retrieval_settings(self) -> "Settings":
         if self.RETRIEVAL_MIN_SIMILARITY > self.RETRIEVAL_CONFIDENCE_THRESHOLD:
@@ -178,6 +204,13 @@ class Settings(BaseSettings):
             )
         if self.EMBEDDING_PROVIDER.lower() == "openai" and not self.OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY must be provided when EMBEDDING_PROVIDER is 'openai'")
+        if self.is_production and self.DEFAULT_LLM_PROVIDER.lower() == "mock":
+            raise ValueError(
+                "Mock LLM provider is strictly prohibited in production. "
+                "Configure a valid DEFAULT_LLM_PROVIDER."
+            )
+        if self.DEFAULT_LLM_PROVIDER.lower() == "openai" and not self.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY must be provided when DEFAULT_LLM_PROVIDER is 'openai'")
         return self
 
     @property

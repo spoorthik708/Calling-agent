@@ -34,6 +34,19 @@ class Permission(str, Enum):
     KNOWLEDGE_DELETE = "knowledge:delete"
     KNOWLEDGE_RETRIEVE = "knowledge:retrieve"
 
+    # Agent permissions (Phase 4)
+    AGENTS_READ = "agents:read"
+    AGENTS_CREATE = "agents:create"
+    AGENTS_UPDATE = "agents:update"
+    AGENTS_DELETE = "agents:delete"
+    AGENTS_MANAGE_KNOWLEDGE = "agents:manage_knowledge"
+    AGENTS_RUN = "agents:run"
+
+    # Conversation permissions (Phase 4)
+    CONVERSATIONS_READ = "conversations:read"
+    CONVERSATIONS_CREATE = "conversations:create"
+    CONVERSATIONS_DELETE = "conversations:delete"
+
 
 # Definitive Role -> Permissions Mapping
 ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
@@ -53,6 +66,15 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.KNOWLEDGE_UPDATE,
         Permission.KNOWLEDGE_DELETE,
         Permission.KNOWLEDGE_RETRIEVE,
+        Permission.AGENTS_READ,
+        Permission.AGENTS_CREATE,
+        Permission.AGENTS_UPDATE,
+        Permission.AGENTS_DELETE,
+        Permission.AGENTS_MANAGE_KNOWLEDGE,
+        Permission.AGENTS_RUN,
+        Permission.CONVERSATIONS_READ,
+        Permission.CONVERSATIONS_CREATE,
+        Permission.CONVERSATIONS_DELETE,
     }),
     Role.ADMIN: frozenset({
         Permission.TENANT_READ,
@@ -68,6 +90,15 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.KNOWLEDGE_UPDATE,
         Permission.KNOWLEDGE_DELETE,
         Permission.KNOWLEDGE_RETRIEVE,
+        Permission.AGENTS_READ,
+        Permission.AGENTS_CREATE,
+        Permission.AGENTS_UPDATE,
+        Permission.AGENTS_DELETE,
+        Permission.AGENTS_MANAGE_KNOWLEDGE,
+        Permission.AGENTS_RUN,
+        Permission.CONVERSATIONS_READ,
+        Permission.CONVERSATIONS_CREATE,
+        Permission.CONVERSATIONS_DELETE,
         # Note: ADMIN does NOT have TENANT_UPDATE or ROLES_MANAGE
     }),
     Role.MEMBER: frozenset({
@@ -76,6 +107,10 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.PROFILE_UPDATE,
         Permission.KNOWLEDGE_READ,
         Permission.KNOWLEDGE_RETRIEVE,
+        Permission.AGENTS_READ,
+        Permission.AGENTS_RUN,
+        Permission.CONVERSATIONS_READ,
+        Permission.CONVERSATIONS_CREATE,
     }),
 }
 

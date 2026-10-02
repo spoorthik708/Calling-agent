@@ -10,6 +10,19 @@ from app.knowledge.models import (
     DocumentChunk,
     Embedding,
 )
+from app.agents.models import (
+    Agent,
+    AgentStatus,
+    AgentKnowledgeBase,
+)
+from app.conversations.models import (
+    Conversation,
+    ConversationChannel,
+    ConversationStatus,
+    Message,
+    MessageRole,
+    IdempotencyRecord,
+)
 
 __all__ = [
     "Base",
@@ -25,4 +38,13 @@ __all__ = [
     "DocumentVersion",
     "DocumentChunk",
     "Embedding",
+    "Agent",
+    "AgentStatus",
+    "AgentKnowledgeBase",
+    "Conversation",
+    "ConversationChannel",
+    "ConversationStatus",
+    "Message",
+    "MessageRole",
+    "IdempotencyRecord",
 ]

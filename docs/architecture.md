@@ -389,3 +389,15 @@ Testing is built into the foundation from day one:
 - **`test_factual_truth_principle.py`**: Validates that unverified business inquiries transition to clarification/escalation rather than hallucinated facts.
 - **`test_tool_security.py`**: Validates tool input sanitization and prevention of command/code injection.
 - **`test_ai_provider_abstraction.py`**: Validates modular AI provider contracts.
+- **`test_agent_crud_and_lifecycle.py`**: Validates tenant-isolated agent management and lifecycle.
+- **`test_agent_knowledge_associations.py`**: Validates explicit agent-to-KB authorization.
+- **`test_conversation_messages_and_memory.py`**: Validates conversation session creation and bounded memory.
+- **`test_agent_runtime_grounding_and_rag.py`**: Validates factual grounding and structured citations.
+- **`test_agent_idempotency_and_concurrency.py`**: Validates duplicate-safe retries and race protection.
+- **`test_agent_security_and_prompt_injection.py`**: Validates delimiter sanitization and secret safety.
+
+---
+
+## 12. Phase 4: Production AI Agent & Conversation Runtime Architecture
+
+For comprehensive architecture details regarding agent configurations, explicit knowledge boundaries, prompt-injection defense, monotonic message sequencing, and concurrency protections, see [`docs/agent-runtime.md`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/docs/agent-runtime.md).
