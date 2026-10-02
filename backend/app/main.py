@@ -85,9 +85,10 @@ def create_application() -> FastAPI:
     @app.exception_handler(YavuraBaseException)
     async def domain_exception_handler(request: Request, exc: YavuraBaseException) -> JSONResponse:
         http_exc = http_exception_from_domain(exc)
+        content = {"detail": http_exc.detail} if isinstance(http_exc.detail, str) else http_exc.detail
         return JSONResponse(
             status_code=http_exc.status_code,
-            content=http_exc.detail,
+            content=content,
         )
 
     # Global Unhandled Exception Handler

@@ -27,6 +27,13 @@ class Permission(str, Enum):
     PROFILE_READ = "profile:read"
     PROFILE_UPDATE = "profile:update"
 
+    # Knowledge & RAG permissions
+    KNOWLEDGE_READ = "knowledge:read"
+    KNOWLEDGE_CREATE = "knowledge:create"
+    KNOWLEDGE_UPDATE = "knowledge:update"
+    KNOWLEDGE_DELETE = "knowledge:delete"
+    KNOWLEDGE_RETRIEVE = "knowledge:retrieve"
+
 
 # Definitive Role -> Permissions Mapping
 ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
@@ -41,6 +48,11 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.ROLES_MANAGE,
         Permission.PROFILE_READ,
         Permission.PROFILE_UPDATE,
+        Permission.KNOWLEDGE_READ,
+        Permission.KNOWLEDGE_CREATE,
+        Permission.KNOWLEDGE_UPDATE,
+        Permission.KNOWLEDGE_DELETE,
+        Permission.KNOWLEDGE_RETRIEVE,
     }),
     Role.ADMIN: frozenset({
         Permission.TENANT_READ,
@@ -51,12 +63,19 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.ROLES_READ,
         Permission.PROFILE_READ,
         Permission.PROFILE_UPDATE,
+        Permission.KNOWLEDGE_READ,
+        Permission.KNOWLEDGE_CREATE,
+        Permission.KNOWLEDGE_UPDATE,
+        Permission.KNOWLEDGE_DELETE,
+        Permission.KNOWLEDGE_RETRIEVE,
         # Note: ADMIN does NOT have TENANT_UPDATE or ROLES_MANAGE
     }),
     Role.MEMBER: frozenset({
         Permission.TENANT_READ,
         Permission.PROFILE_READ,
         Permission.PROFILE_UPDATE,
+        Permission.KNOWLEDGE_READ,
+        Permission.KNOWLEDGE_RETRIEVE,
     }),
 }
 

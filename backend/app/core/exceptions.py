@@ -4,10 +4,15 @@ from fastapi import HTTPException, status
 
 class YavuraBaseException(Exception):
     """Base exception for all YAVURA domain exceptions."""
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None, code: Optional[str] = None):
         super().__init__(message)
         self.message = message
         self.details = details or {}
+        self.code = code or "DOMAIN_ERROR"
+
+
+# Compatibility alias
+YavuraException = YavuraBaseException
 
 
 class TenantIsolationError(YavuraBaseException):
@@ -43,6 +48,29 @@ class EntityNotFoundError(YavuraBaseException):
     pass
 
 
+ResourceNotFoundError = EntityNotFoundError
+
+
+class KnowledgeBaseNotFoundError(EntityNotFoundError):
+    """Raised when knowledge base is not found."""
+    pass
+
+
+class DocumentNotFoundError(EntityNotFoundError):
+    """Raised when document is not found."""
+    pass
+
+
+class KnowledgeIngestionError(YavuraBaseException):
+    """Raised during document ingestion pipeline failures."""
+    pass
+
+
+class LowRetrievalConfidenceError(YavuraBaseException):
+    """Raised when retrieved knowledge fails minimum confidence threshold."""
+    pass
+
+
 def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
     """Maps domain exceptions to appropriate HTTPExceptions."""
     if isinstance(exc, TenantIsolationError):
@@ -69,6 +97,22 @@ def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
         return HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "RESOURCE_NOT_FOUND", "message": exc.message, "details": exc.details},
+        )
+    elif getattr(exc, "code", None) in (
+        "UNSUPPORTED_FILE_TYPE",
+        "FILE_TOO_LARGE",
+        "INVALID_FILE",
+        "DOCUMENT_EMPTY",
+        "OCR_REQUIRED",
+        "TEXT_EXTRACTION_FAILED",
+        "INVALID_PDF",
+        "ENCRYPTED_PDF",
+        "INGESTION_FAILED",
+        "EMBEDDING_FAILED",
+    ):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=exc.message,
         )
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

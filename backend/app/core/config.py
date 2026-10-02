@@ -1,7 +1,7 @@
 import os
 from functools import lru_cache
 from typing import List, Optional
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -98,6 +98,58 @@ class Settings(BaseSettings):
         description="List of trusted reverse proxy IP addresses allowed to forward client identity",
     )
 
+    # Knowledge Base & RAG Settings (Phase 3)
+    KNOWLEDGE_STORAGE_PATH: str = Field(default="storage/documents")
+    MAX_UPLOAD_SIZE_BYTES: int = Field(
+        default=10 * 1024 * 1024,
+        description="Maximum upload file size in bytes (10MB default)",
+    )
+    ALLOWED_DOCUMENT_TYPES: List[str] = Field(
+        default_factory=lambda: ["text/plain", "application/pdf"],
+        description="Permitted document MIME types for ingestion",
+    )
+    EMBEDDING_PROVIDER: str = Field(
+        default="mock",
+        description="Active embedding provider: mock, openai, etc.",
+    )
+    EMBEDDING_MODEL: str = Field(
+        default="text-embedding-3-small",
+        description="Model name for generating vector embeddings",
+    )
+    EMBEDDING_DIMENSION: int = Field(
+        default=1536,
+        description="Vector dimension for embeddings (e.g. 1536 for OpenAI small)",
+    )
+    CHUNK_SIZE: int = Field(
+        default=500,
+        description="Target character length for document text chunks",
+    )
+    CHUNK_OVERLAP: int = Field(
+        default=50,
+        description="Character overlap between consecutive chunks",
+    )
+    RETRIEVAL_TOP_K: int = Field(
+        default=5,
+        description="Default number of top matching chunks to retrieve",
+    )
+    RETRIEVAL_MIN_SIMILARITY: float = Field(
+        default=0.30,
+        description="Minimum cosine similarity threshold to consider relevant",
+    )
+    RETRIEVAL_CONFIDENCE_THRESHOLD: float = Field(
+        default=0.40,
+        description="Threshold above which retrieval is considered high confidence FOUND",
+    )
+
+    MAX_DOCUMENT_PAGES: int = Field(
+        default=500,
+        description="Maximum allowed pages in a single PDF document",
+    )
+    MAX_DOCUMENT_CHUNKS: int = Field(
+        default=1000,
+        description="Maximum allowed chunks generated from a single document",
+    )
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v):
@@ -111,6 +163,22 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [i.strip() for i in v.split(",") if i.strip()]
         return v
+
+    @model_validator(mode="after")
+    def validate_knowledge_and_retrieval_settings(self) -> "Settings":
+        if self.RETRIEVAL_MIN_SIMILARITY > self.RETRIEVAL_CONFIDENCE_THRESHOLD:
+            raise ValueError(
+                f"RETRIEVAL_MIN_SIMILARITY ({self.RETRIEVAL_MIN_SIMILARITY}) cannot be greater than "
+                f"RETRIEVAL_CONFIDENCE_THRESHOLD ({self.RETRIEVAL_CONFIDENCE_THRESHOLD})"
+            )
+        if self.is_production and self.EMBEDDING_PROVIDER.lower() == "mock":
+            raise ValueError(
+                "Mock embedding provider is strictly prohibited in production. "
+                "Configure a valid EMBEDDING_PROVIDER."
+            )
+        if self.EMBEDDING_PROVIDER.lower() == "openai" and not self.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY must be provided when EMBEDDING_PROVIDER is 'openai'")
+        return self
 
     @property
     def is_production(self) -> bool:

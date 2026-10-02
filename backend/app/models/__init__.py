@@ -3,6 +3,13 @@ from app.tenants.models import Tenant
 from app.users.models import User
 from app.auth.models import RefreshToken
 from app.models.audit import AuditLog
+from app.knowledge.models import (
+    KnowledgeBase,
+    Document,
+    DocumentVersion,
+    DocumentChunk,
+    Embedding,
+)
 
 __all__ = [
     "Base",
@@ -13,4 +20,9 @@ __all__ = [
     "User",
     "RefreshToken",
     "AuditLog",
+    "KnowledgeBase",
+    "Document",
+    "DocumentVersion",
+    "DocumentChunk",
+    "Embedding",
 ]

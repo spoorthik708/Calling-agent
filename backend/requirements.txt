@@ -11,6 +11,10 @@ greenlet>=3.0.0
 alembic>=1.13.1
 asyncpg>=0.29.0
 aiosqlite>=0.20.0
+pgvector>=0.3.0
+
+# Document Processing & Knowledge
+pypdf>=4.0.0
 
 # Security & Authentication
 python-jose[cryptography]>=3.3.0
