@@ -23,6 +23,7 @@ class Tenant(Base, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     tier: Mapped[str] = mapped_column(String(50), default="standard", nullable=False)
 

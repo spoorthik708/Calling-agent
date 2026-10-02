@@ -33,6 +33,11 @@ class ToolNotFoundError(YavuraBaseException):
     pass
 
 
+class PasswordPolicyViolationError(YavuraBaseException):
+    """Raised when password policy fails."""
+    pass
+
+
 class EntityNotFoundError(YavuraBaseException):
     """Raised when a requested resource is not found within tenant boundary."""
     pass
@@ -54,6 +59,11 @@ def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "TOOL_SECURITY_VIOLATION", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, PasswordPolicyViolationError):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "PASSWORD_POLICY_VIOLATION", "message": exc.message, "details": exc.details},
         )
     elif isinstance(exc, EntityNotFoundError):
         return HTTPException(

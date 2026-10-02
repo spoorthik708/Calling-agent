@@ -5,12 +5,6 @@ import sys
 from typing import Any, Dict
 
 
-# Regex patterns for sensitive field redaction
-SENSITIVE_PATTERNS = [
-    re.compile(r'"?(password|secret|token|api_key|authorization|bearer|card_number)"?\s*[:=]\s*"?[^",\s]+"?', re.IGNORECASE),
-    re.compile(r'bearer\s+[a-zA-Z0-9_\-\.]+', re.IGNORECASE),
-]
-
 SENSITIVE_KEYS = {
     "password", "secret", "token", "access_token", "refresh_token",
     "api_key", "apikey", "authorization", "auth", "secret_key",
@@ -18,8 +12,25 @@ SENSITIVE_KEYS = {
 }
 
 
+def redact_string(text: str) -> str:
+    """Masks embedded credentials in string values."""
+    scrubbed = re.sub(
+        r'("?(password|secret|token|api_key|authorization|card_number)"?\s*[:=]\s*)"?[^",\s]+"?',
+        r'\1"[REDACTED]"',
+        text,
+        flags=re.IGNORECASE,
+    )
+    scrubbed = re.sub(
+        r'(bearer\s+)[a-zA-Z0-9_\-\.]+',
+        r'\1[REDACTED]',
+        scrubbed,
+        flags=re.IGNORECASE,
+    )
+    return scrubbed
+
+
 def sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively scrub sensitive keys from dictionaries."""
+    """Recursively scrub sensitive keys and string patterns from dictionaries."""
     sanitized: Dict[str, Any] = {}
     for key, value in data.items():
         if any(sensitive in key.lower() for sensitive in SENSITIVE_KEYS):
@@ -32,10 +43,7 @@ def sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
                 for item in value
             ]
         elif isinstance(value, str):
-            scrubbed = value
-            for pattern in SENSITIVE_PATTERNS:
-                scrubbed = pattern.sub(r'\1="[REDACTED]"', scrubbed)
-            sanitized[key] = scrubbed
+            sanitized[key] = redact_string(value)
         else:
             sanitized[key] = value
     return sanitized

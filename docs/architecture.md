@@ -160,6 +160,54 @@ Future AI tool execution is locked down by `validate_tool_arguments`:
 
 ---
 
+## 5.1 Phase 2: Authentication, Tenant Onboarding & RBAC Architecture
+
+### 1. Transactional Registration Workflow (`POST /api/v1/auth/register`)
+- Atomically provisions:
+  1. `Tenant` entity with `status="active"`.
+  2. Initial administrative `User` with server-enforced role `Role.OWNER`.
+  3. `AuditLog` entry capturing registration metadata.
+  4. Initial cryptographically hashed `RefreshToken` session.
+- **Rollback Guarantee**: If any portion of user or token creation fails, the transaction is completely rolled back to prevent orphaned tenant records.
+- **Role Assignment**: Clients cannot self-assign privileged roles; the backend strictly dictates the initial user role as `owner`.
+
+### 2. JWT Access Token Security
+- **Claims**: Strictly minimal claims (`sub` = user UUID, `tenant_id` = tenant UUID, `role` = user role, `type="access"`, `jti`, `iat`, `exp`).
+- **No Sensitive Leakage**: Passwords, email, account details, and business data are never placed inside the JWT.
+- **Verification**: Signature, expiration, and token type are validated on every authenticated request by the `get_current_user` FastAPI dependency.
+
+### 3. Server-Side Refresh Token Architecture & Rotation
+- **Never Plaintext**: Only deterministic SHA-256 hashes (`token_hash`) of high-entropy raw refresh tokens are persisted in `refresh_tokens`.
+- **Token Rotation**: Every `/api/v1/auth/refresh` invocation revokes the submitted token and issues a new refresh token and access token.
+- **Compromise / Replay Detection**: Refresh tokens are grouped into a `family_id`. If an already rotated or revoked token is reused, the entire token family is immediately revoked, protecting against stolen credential replay attacks.
+- **Logout (`POST /api/v1/auth/logout`)**: Explicitly invalidates the server-side refresh token record (or all active user sessions).
+
+### 4. Role-Based Access Control (RBAC) Matrix
+
+| Permission | Role: OWNER | Role: ADMIN | Role: MEMBER | Description |
+| :--- | :---: | :---: | :---: | :--- |
+| `tenant:read` | Yes | Yes | Yes | View organization profile |
+| `tenant:update` | Yes | No | No | Modify organization configuration |
+| `users:read` | Yes | Yes | No | View user directory for tenant |
+| `users:create` | Yes | Yes | No | Invite / add users to tenant |
+| `users:update` | Yes | Yes (Members only) | No | Update user status or roles |
+| `users:disable` | Yes | Yes (Members only) | No | Disable or suspend tenant users |
+| `roles:read` | Yes | Yes | No | View tenant roles |
+| `roles:manage` | Yes | No | No | Manage privileged roles |
+| `profile:read` | Yes | Yes | Yes | View authenticated user profile |
+| `profile:update` | Yes | Yes | Yes | Update own name |
+
+### 5. Tenant Owner Protection Boundary
+- Administrative users (`ADMIN`) cannot modify, disable, or delete an `OWNER`.
+- Administrative users cannot promote members to `OWNER`. Only the existing `OWNER` can perform owner-level operations.
+- Non-owners cannot update tenant organization settings.
+
+### 6. Anti-Enumeration & Throttling
+- Authentication failures on `/api/v1/auth/login` consistently return a generic `401 Unauthorized: Invalid email or password` without revealing whether an email exists.
+- Rate limiting interface (`RateLimiterInterface` / `InMemoryRateLimiter`) throttles registration and login attempts by client IP.
+
+---
+
 ## 6. Modular AI Provider Abstraction
 
 YAVURA does not couple business logic to any single AI vendor (OpenAI, Anthropic, Google, etc.).

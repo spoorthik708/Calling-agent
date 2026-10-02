@@ -17,8 +17,8 @@ from app.core.config import get_settings
 from app.database.base import Base
 from app.database.session import get_db
 from app.main import app
-from app.models import Tenant, User
-from app.core.security import get_password_hash
+from app.models import Tenant, User, RefreshToken
+from app.core.security import get_password_hash, create_access_token
 
 # Test async engine using SQLite
 test_engine = create_async_engine(
@@ -83,6 +83,7 @@ async def seed_tenants(db_session: AsyncSession):
         id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
         name="Company Alpha",
         slug="company-alpha",
+        status="active",
         is_active=True,
         tier="enterprise",
     )
@@ -90,6 +91,7 @@ async def seed_tenants(db_session: AsyncSession):
         id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
         name="Company Beta",
         slug="company-beta",
+        status="active",
         is_active=True,
         tier="starter",
     )
@@ -99,16 +101,22 @@ async def seed_tenants(db_session: AsyncSession):
         id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         tenant_id=tenant_a.id,
         email="admin@alpha.com",
-        hashed_password=get_password_hash("password123"),
-        role="admin",
+        hashed_password=get_password_hash("password123456"),
+        first_name="Alice",
+        last_name="Alpha",
+        role="owner",
+        status="active",
         is_active=True,
     )
     user_b = User(
         id=uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
         tenant_id=tenant_b.id,
         email="admin@beta.com",
-        hashed_password=get_password_hash("password123"),
-        role="admin",
+        hashed_password=get_password_hash("password123456"),
+        first_name="Bob",
+        last_name="Beta",
+        role="owner",
+        status="active",
         is_active=True,
     )
     db_session.add_all([user_a, user_b])
