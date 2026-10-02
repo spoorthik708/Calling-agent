@@ -83,6 +83,12 @@ class Agent(Base, TimestampMixin, TenantAwareModel):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    tool_associations: Mapped[List["AgentTool"]] = relationship(  # noqa: F821
+        "AgentTool",
+        back_populates="agent",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     conversations: Mapped[List["Conversation"]] = relationship(
         "Conversation",
         back_populates="agent",

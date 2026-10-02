@@ -190,6 +190,40 @@ class Settings(BaseSettings):
         description="Maximum conversational execution turns allowed per tenant/user per minute",
     )
 
+    # Tool & Action Layer Settings (Phase 5)
+    MAX_TOOL_CALLS_PER_TURN: int = Field(
+        default=3,
+        description="Maximum sequential tool calls permitted per conversational turn",
+    )
+    DEFAULT_TOOL_TIMEOUT_SECONDS: float = Field(
+        default=10.0,
+        description="Default timeout in seconds for external and internal tool execution",
+    )
+    TOOL_IDEMPOTENCY_EXPIRE_HOURS: int = Field(
+        default=24,
+        description="Hours before tool execution idempotency keys expire",
+    )
+    TOOL_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=120,
+        description="Maximum tool executions allowed per tenant per minute",
+    )
+    SSRF_ALLOW_HTTP_FOR_TESTING: bool = Field(
+        default=False,
+        description="Whether to permit HTTP scheme for local testing (production requires HTTPS)",
+    )
+    MAX_HTTP_TOOL_RESPONSE_BYTES: int = Field(
+        default=2 * 1024 * 1024,
+        description="Maximum allowed HTTP response body size in bytes (2MB default)",
+    )
+    MAX_TOOL_ARGUMENT_BYTES: int = Field(
+        default=64 * 1024,
+        description="Maximum allowed JSON size in bytes for tool input arguments (64KB default)",
+    )
+    MAX_HTTP_TOOL_REDIRECTS: int = Field(
+        default=3,
+        description="Maximum allowed validated redirect hops for HTTP tools",
+    )
+
     @model_validator(mode="after")
     def validate_knowledge_and_retrieval_settings(self) -> "Settings":
         if self.RETRIEVAL_MIN_SIMILARITY > self.RETRIEVAL_CONFIDENCE_THRESHOLD:

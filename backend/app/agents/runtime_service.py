@@ -242,33 +242,139 @@ class AgentRuntimeService:
         history_records = (await self.db.execute(stmt_history)).scalars().all()
         bounded_history = self.memory_manager.select_history(history_records)
 
-        # 8. Build Grounded Model Messages
+        # 7b. Resolve Assigned Tools for Agent
+        from app.tools.models import AgentTool, ToolDefinition
+        from app.tools.service import ToolExecutionService
+        from app.tools.base import ToolResult
+        from app.tools.registry import default_tool_registry
+
+        stmt_tools = select(AgentTool, ToolDefinition).join(
+            ToolDefinition, AgentTool.tool_id == ToolDefinition.id
+        ).where(
+            AgentTool.tenant_id == tenant_id,
+            AgentTool.agent_id == agent.id,
+            AgentTool.enabled == True,
+            ToolDefinition.is_active == True,
+        )
+        assigned_tools_rows = (await self.db.execute(stmt_tools)).all()
+        available_tool_declarations = [
+            {
+                "name": t_def.name,
+                "description": t_def.description,
+                "parameters": t_def.input_schema,
+                "version": t_def.version,
+            }
+            for _, t_def in assigned_tools_rows
+        ]
+
+        # 8. Build Initial Grounded Model Messages
         llm_messages = GroundedContextBuilder.build_messages(
             agent_system_prompt=agent.system_prompt,
             conversation_language=conversation.language or agent.default_language,
             citations=all_citations,
             history=bounded_history,
             current_user_message=normalized_content,
+            available_tools=available_tool_declarations,
         )
 
-        # 9. Invoke LLM Provider
+        # 9. Invoke LLM Provider with Bounded Tool Execution Loop
         provider = LLMProviderFactory.get_provider(agent.llm_provider)
         llm_start = time.perf_counter()
+        max_tool_calls = min(self.settings.MAX_TOOL_CALLS_PER_TURN, 3)
+        executed_tool_results: List[ToolResult] = []
+        tool_service = ToolExecutionService(self.db, default_tool_registry)
 
         try:
-            llm_response: LLMResponse = await provider.generate(
-                messages=llm_messages,
-                model=agent.llm_model,
-                temperature=agent.temperature,
-                max_output_tokens=agent.max_output_tokens,
-            )
+            llm_response: Optional[LLMResponse] = None
+            for loop_idx in range(max_tool_calls):
+                llm_response = await provider.generate(
+                    messages=llm_messages,
+                    model=agent.llm_model,
+                    temperature=agent.temperature,
+                    max_output_tokens=agent.max_output_tokens,
+                )
+
+                # Check for tool call request
+                tool_req = None
+                if llm_response.tool_calls:
+                    tool_req = llm_response.tool_calls[0]
+                elif "```tool_request" in llm_response.content:
+                    try:
+                        raw_json = (
+                            llm_response.content.split("```tool_request")[1]
+                            .split("```")[0]
+                            .strip()
+                        )
+                        parsed = json.loads(raw_json)
+                        if "tool_name" in parsed:
+                            tool_req = parsed
+                    except Exception:
+                        pass
+
+                if not tool_req:
+                    # Final text response reached
+                    break
+
+                # Execute requested tool server-side through ToolExecutionService
+                t_name = tool_req.get("tool_name")
+                t_args = tool_req.get("arguments", {})
+                t_idem = (
+                    f"conv_{conversation.id}_u{user_seq}_call{loop_idx}"
+                    if idempotency_key
+                    else None
+                )
+
+                try:
+                    tool_res = await tool_service.execute_tool(
+                        tenant_id=tenant_id,
+                        tool_identifier=t_name,
+                        arguments=t_args,
+                        agent_id=agent.id,
+                        conversation_id=conversation.id,
+                        actor_id=actor_id,
+                        idempotency_key=t_idem,
+                        correlation_id=str(uuid.uuid4()),
+                    )
+                    executed_tool_results.append(tool_res)
+                except Exception as t_err:
+                    executed_tool_results.append(
+                        ToolResult(
+                            tool_name=t_name,
+                            tool_version="1.0.0",
+                            success=False,
+                            data={},
+                            error_category=type(t_err).__name__,
+                            error_message=str(t_err),
+                        )
+                    )
+
+                # Update context with executed tool results for next model turn
+                llm_messages = GroundedContextBuilder.build_messages(
+                    agent_system_prompt=agent.system_prompt,
+                    conversation_language=conversation.language or agent.default_language,
+                    citations=all_citations,
+                    history=bounded_history,
+                    current_user_message=normalized_content,
+                    available_tools=available_tool_declarations,
+                    tool_results=executed_tool_results,
+                )
+
             llm_latency_ms = (time.perf_counter() - llm_start) * 1000.0
-            assistant_content = llm_response.content.strip()
+            raw_assistant = llm_response.content.strip() if llm_response else ""
+            if "```tool_request" in raw_assistant:
+                raw_assistant = raw_assistant.split("```tool_request")[0].strip()
+
+            assistant_content = raw_assistant
 
             # 10. Response Validation
             if not assistant_content:
-                logger.warning("LLM provider returned empty response. Applying fallback.")
-                assistant_content = agent.fallback_message
+                if executed_tool_results and executed_tool_results[-1].success:
+                    assistant_content = (
+                        "The requested business action was completed successfully."
+                    )
+                else:
+                    logger.warning("LLM provider returned empty response. Applying fallback.")
+                    assistant_content = agent.fallback_message
 
         except LLMProviderError as pe:
             logger.error("LLM Provider failure: %s. Using configured fallback.", pe.message)
@@ -315,6 +421,8 @@ class AgentRuntimeService:
                 "retrieval_latency_ms": round(retrieval_latency_ms, 2),
                 "llm_latency_ms": round(llm_latency_ms, 2),
                 "citations_count": len(formatted_citations),
+                "tool_executions_count": len(executed_tool_results),
+                "tools_executed": [r.tool_name for r in executed_tool_results],
             },
         )
         self.db.add(assistant_msg)
@@ -335,6 +443,8 @@ class AgentRuntimeService:
                 "user_seq": user_seq,
                 "assistant_seq": assistant_seq,
                 "citations_count": len(formatted_citations),
+                "tool_executions_count": len(executed_tool_results),
+                "tools_executed": [r.tool_name for r in executed_tool_results],
                 "llm_provider": agent.llm_provider,
                 "llm_model": agent.llm_model,
             },
@@ -360,6 +470,8 @@ class AgentRuntimeService:
                 "retrieval_latency_ms": round(retrieval_latency_ms, 2),
                 "llm_latency_ms": round(llm_latency_ms, 2),
                 "total_latency_ms": round(total_latency_ms, 2),
+                "tool_executions_count": len(executed_tool_results),
+                "tools_executed": [r.tool_name for r in executed_tool_results],
             },
         }
 

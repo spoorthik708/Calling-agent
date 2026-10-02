@@ -361,13 +361,19 @@ Documents are untrusted user data that may contain malicious instructions (e.g.,
 
 ---
 
-## 9. Future Tool Architecture
+## 9. Production AI Tool & Action Layer Architecture (Phase 5)
 
-All business tools callable by AI agents are governed by `ToolRegistry`:
-- Tools must declare a strict Pydantic `input_schema` and `output_schema`.
-- Every tool call receives a `ToolExecutionContext` containing `tenant_id`, `session_id`, and `user_id`.
-- Arguments are validated before execution; unauthorized operations or arguments that do not conform to schema are rejected.
-- Every invocation generates an audit trail entry.
+All business tools callable by AI agents are governed by the server-side `ToolRegistry` and `ToolExecutionService`:
+- **Core Principle:** LLM decides whether a tool is useful. The server decides whether the tool is allowed. The tool implementation decides what actually happens. Database/tool results remain the source of truth.
+- **Tool Domain Models:** `ToolDefinition`, `AgentTool` (explicit authorization boundary), and `ToolExecution` (immutable audit trail).
+- **Tool Types:** Explicitly registered server-side `INTERNAL` tools (`LookupCustomerTool`, `CreateFollowupTool`) and controlled `HTTP_API` tools (`HttpApiTool`). Zero dynamic code execution or arbitrary module importing.
+- **15-Step Pipeline:** Authentication, tenant isolation, agent active check, explicit assignment verification, RBAC check, Pydantic input validation, injection & SSRF defense, idempotency check, tenant rate limiting, timeout enforcement, sanitized persistence, and structured result return.
+- **SSRF Defenses:** DNS pre-resolution, blocking loopback, RFC 1918 private ranges, link-local, cloud metadata services, internal TLDs, and non-HTTPS schemes.
+- **Credential Architecture:** `CredentialReference` pointers in configuration; server-side `CredentialProvider` secret resolution; recursive deep secret scrubbing.
+- **Idempotency & Resilience:** Safe retry semantics via `idempotency_key`, bounded timeouts, and exponential backoff on transient 5xx errors for safe/idempotent operations.
+- **Agent Integration:** Bounded tool-call loop (`MAX_TOOL_CALLS_PER_TURN = 3`), tool result delimiter neutralization, and strict factual truth enforcement.
+
+For complete specifications, see [`docs/tool-runtime.md`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/docs/tool-runtime.md).
 
 ---
 
@@ -377,6 +383,9 @@ Initialized with SQLAlchemy 2.0 Declarative Models and Alembic migrations:
 - **`tenants`**: Enterprise tenant account entity (`id`, `name`, `slug`, `is_active`, `tier`, timestamps).
 - **`users`**: Tenant-scoped user accounts with bcrypt hashed passwords and RBAC roles.
 - **`audit_logs`**: Immutable security and audit logging tracking tenant actions and tool executions.
+- **`knowledge_bases`**, **`documents`**, **`document_versions`**, **`document_chunks`**, **`embeddings`**: Verified Knowledge & RAG foundation.
+- **`agents`**, **`agent_knowledge_bases`**, **`conversations`**, **`messages`**, **`idempotency_records`**: Conversational agent and runtime entities.
+- **`tool_definitions`**, **`agent_tools`**, **`tool_executions`**: Approved business capabilities, agent assignments, and execution audit trails.
 
 ---
 
@@ -395,9 +404,21 @@ Testing is built into the foundation from day one:
 - **`test_agent_runtime_grounding_and_rag.py`**: Validates factual grounding and structured citations.
 - **`test_agent_idempotency_and_concurrency.py`**: Validates duplicate-safe retries and race protection.
 - **`test_agent_security_and_prompt_injection.py`**: Validates delimiter sanitization and secret safety.
+- **`test_tool_crud_and_lifecycle.py`**: Validates tool definition CRUD, RBAC, tenant isolation, and secret scrubbing.
+- **`test_agent_tool_assignment.py`**: Validates explicit agent tool assignments and unassigned execution denial.
+- **`test_tool_execution_pipeline.py`**: Validates 15-step execution pipeline, rate limits, inactive agent checks, and audit logging.
+- **`test_tool_ssrf_and_security.py`**: Validates SSRF blocking (private IPs, metadata, loopback, internal domains), injection rejection, and secret isolation.
+- **`test_tool_idempotency_and_resilience.py`**: Validates duplicate caching, conflict detection, timeouts, and bounded retries.
+- **`test_agent_runtime_tool_integration.py`**: Validates end-to-end agent turn tool loop, grounding on tool results, prompt injection neutralization in tool output, and loop limits.
 
 ---
 
 ## 12. Phase 4: Production AI Agent & Conversation Runtime Architecture
 
 For comprehensive architecture details regarding agent configurations, explicit knowledge boundaries, prompt-injection defense, monotonic message sequencing, and concurrency protections, see [`docs/agent-runtime.md`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/docs/agent-runtime.md).
+
+---
+
+## 13. Phase 5: Production AI Tool & Action Layer Architecture
+
+For comprehensive architecture details regarding tool models, deterministic registry, 15-step execution pipeline, SSRF defenses, credential architecture, idempotency, timeouts, audit logging, and agent runtime integration, see [`docs/tool-runtime.md`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/docs/tool-runtime.md).

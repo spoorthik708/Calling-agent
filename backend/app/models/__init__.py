@@ -23,6 +23,13 @@ from app.conversations.models import (
     MessageRole,
     IdempotencyRecord,
 )
+from app.tools.models import (
+    ToolDefinition,
+    AgentTool,
+    ToolExecution,
+    ToolType,
+    ToolExecutionStatus,
+)
 
 __all__ = [
     "Base",
@@ -47,4 +54,9 @@ __all__ = [
     "Message",
     "MessageRole",
     "IdempotencyRecord",
+    "ToolDefinition",
+    "AgentTool",
+    "ToolExecution",
+    "ToolType",
+    "ToolExecutionStatus",
 ]

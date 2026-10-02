@@ -5,35 +5,58 @@ from app.core.exceptions import (
     TenantIsolationError,
     ToolExecutionSecurityError,
     ToolNotFoundError,
+    ToolValidationError,
 )
 from app.core.logging import get_logger
 from app.security.input_validation import validate_tool_arguments
-from app.tools.base import BaseTool, ToolExecutionContext
+from app.tools.base import (
+    BaseTool,
+    CreateFollowupTool,
+    LookupCustomerTool,
+    ToolExecutionContext,
+)
 
-logger = get_logger("yavura.tools")
+logger = get_logger("yavura.tools.registry")
 
 
 class ToolRegistry:
     """
     Central, secure registry of tools accessible to AI agents.
-    Enforces tenant context, schema validation, and injection prevention before execution.
+    Enforces deterministic lookup, explicit registration, tenant context,
+    schema validation, and injection prevention before execution.
     """
-    def __init__(self):
+    def __init__(self, register_builtins: bool = True):
         self._tools: Dict[str, BaseTool] = {}
+        if register_builtins:
+            self.register_tool(LookupCustomerTool())
+            self.register_tool(CreateFollowupTool())
 
     def register_tool(self, tool: BaseTool) -> None:
         """Registers a tool in the registry."""
         if not tool.name or not tool.input_schema or not tool.output_schema:
             raise ValueError(f"Tool {tool} must specify name, input_schema, and output_schema.")
         self._tools[tool.name] = tool
-        logger.info(f"Registered tool: {tool.name}")
+        logger.info("Registered server-side tool: %s (version=%s)", tool.name, getattr(tool, "version", "1.0.0"))
+
+    # Alias for clean dependency injection
+    register = register_tool
 
     def get_tool(self, name: str) -> BaseTool:
         """Retrieves a registered tool or raises ToolNotFoundError."""
         tool = self._tools.get(name)
         if not tool:
-            raise ToolNotFoundError(f"Requested tool '{name}' is not registered.")
+            raise ToolNotFoundError(
+                f"Requested tool '{name}' is not registered.",
+                details={"tool_name": name},
+            )
         return tool
+
+    # Alias for lookup
+    get = get_tool
+
+    def has_tool(self, name: str) -> bool:
+        """Checks if a tool name is registered."""
+        return name in self._tools
 
     def list_declarations(self) -> List[Dict[str, Any]]:
         """Returns schemas of all registered tools for AI agent capabilities."""
@@ -52,7 +75,7 @@ class ToolRegistry:
         3. Arguments validated strictly against tool's Pydantic schema.
         4. Tool executed within tenant scope.
         """
-        if not context.tenant_id:
+        if not context or not context.tenant_id:
             raise TenantIsolationError("Tool execution forbidden without explicit tenant context.")
 
         # Security check: Prohibit arbitrary commands, scripts, code injections
@@ -69,7 +92,10 @@ class ToolRegistry:
             )
 
         logger.info(
-            f"Executing tool '{tool_name}' for tenant={context.tenant_id} session={context.session_id}"
+            "Executing tool '%s' for tenant=%s session=%s",
+            tool_name,
+            context.tenant_id,
+            context.session_id,
         )
 
         # Execute
@@ -77,3 +103,7 @@ class ToolRegistry:
 
         # Output serialization
         return result.model_dump()
+
+
+# Default singleton instance
+default_tool_registry = ToolRegistry(register_builtins=True)

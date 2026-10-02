@@ -97,6 +97,57 @@ class LLMProviderError(YavuraBaseException):
     pass
 
 
+# Phase 5 Tool & Action Exceptions
+class ToolNotAssignedError(YavuraBaseException):
+    """Raised when an agent attempts to execute a tool not explicitly assigned to it."""
+    pass
+
+
+class ToolDisabledError(YavuraBaseException):
+    """Raised when attempting to execute a deactivated or archived tool."""
+    pass
+
+
+class ToolAuthorizationError(YavuraBaseException):
+    """Raised when caller or agent lacks required permissions to execute tool."""
+    pass
+
+
+class ToolValidationError(YavuraBaseException):
+    """Raised when tool inputs or schemas fail validation."""
+    pass
+
+
+class ToolExecutionError(YavuraBaseException):
+    """Raised when a tool encounters an unhandled runtime error during execution."""
+    pass
+
+
+class ToolTimeoutError(YavuraBaseException):
+    """Raised when tool execution exceeds configured timeout boundary."""
+    pass
+
+
+class ToolRateLimitError(YavuraBaseException):
+    """Raised when tenant tool execution exceeds rate limit quota."""
+    pass
+
+
+class CredentialResolutionError(YavuraBaseException):
+    """Raised when resolving tool credential reference fails server-side."""
+    pass
+
+
+class SSRFBlockedError(YavuraBaseException):
+    """Raised when HTTP tool destination target violates SSRF security boundaries."""
+    pass
+
+
+class ToolIdempotencyConflictError(YavuraBaseException):
+    """Raised when tool idempotency key is reused with a conflicting payload."""
+    pass
+
+
 def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
     """Maps domain exceptions to appropriate HTTPExceptions."""
     if isinstance(exc, TenantIsolationError):
@@ -109,10 +160,50 @@ def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "FACTUAL_TRUTH_VIOLATION", "message": exc.message, "details": exc.details},
         )
-    elif isinstance(exc, ToolExecutionSecurityError):
+    elif isinstance(exc, SSRFBlockedError):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"code": "TOOL_SECURITY_VIOLATION", "message": exc.message, "details": exc.details},
+            detail={"code": "SSRF_SECURITY_VIOLATION", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, (ToolExecutionSecurityError, ToolValidationError)):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "TOOL_VALIDATION_ERROR", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, (ToolNotAssignedError, ToolAuthorizationError)):
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "TOOL_ACCESS_DENIED", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, ToolDisabledError):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "TOOL_DISABLED", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, ToolTimeoutError):
+        return HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail={"code": "TOOL_TIMEOUT", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, ToolRateLimitError):
+        return HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"code": "TOOL_RATE_LIMITED", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, (IdempotencyConflictError, ToolIdempotencyConflictError)):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "IDEMPOTENCY_CONFLICT", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, CredentialResolutionError):
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"code": "CREDENTIAL_ERROR", "message": "Failed to resolve secure tool credentials."},
+        )
+    elif isinstance(exc, (ToolExecutionError, LLMProviderError)):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "EXECUTION_ERROR", "message": exc.message, "details": exc.details},
         )
     elif isinstance(exc, PasswordPolicyViolationError):
         return HTTPException(
@@ -123,16 +214,6 @@ def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "INACTIVE_AGENT", "message": exc.message, "details": exc.details},
-        )
-    elif isinstance(exc, IdempotencyConflictError):
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "IDEMPOTENCY_CONFLICT", "message": exc.message, "details": exc.details},
-        )
-    elif isinstance(exc, LLMProviderError):
-        return HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={"code": "LLM_PROVIDER_ERROR", "message": exc.message, "details": exc.details},
         )
     elif isinstance(exc, EntityNotFoundError):
         return HTTPException(

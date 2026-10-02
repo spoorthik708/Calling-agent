@@ -29,6 +29,7 @@ class LLMResponse:
     total_tokens: Optional[int] = None
     latency_ms: float = 0.0
     raw_response: Optional[Dict[str, Any]] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
 
 
 @runtime_checkable
@@ -74,20 +75,54 @@ class MockLLMProvider:
             )
 
         start_time = time.perf_counter()
+        tool_calls: Optional[List[Dict[str, Any]]] = None
 
         if self.fixed_response is not None:
             content = self.fixed_response
         else:
-            # Check prompt for user message and verified knowledge
+            # Check prompt for user message, verified knowledge, and tool results
             user_content = ""
             system_content = ""
             for m in messages:
                 if m.role == "user":
                     user_content = m.content
                 elif m.role == "system":
-                    system_content = m.content
+                    system_content += "\n" + m.content
 
-            if (
+            # Check if verified tool results are present in context
+            if "<tool_result" in system_content:
+                if 'success="true"' in system_content:
+                    content = f"Based on the verified tool execution: The requested operation was completed successfully."
+                else:
+                    content = "I'm sorry, but I was unable to retrieve the requested information from the business system."
+            # Check if user message triggers an authorized tool request
+            elif "AUTHORIZED BUSINESS TOOLS" in system_content and any(
+                keyword in user_content.lower()
+                for keyword in ("lookup", "customer", "followup", "status", "check_order", "crm")
+            ):
+                if "create_followup" in system_content and "followup" in user_content.lower():
+                    tool_calls = [{
+                        "tool_name": "create_followup",
+                        "arguments": {"customer_id": "cust_123", "topic": "General Inquiry", "priority": "medium"},
+                    }]
+                    content = (
+                        "```tool_request\n"
+                        '{"tool_name": "create_followup", "arguments": {"customer_id": "cust_123", "topic": "General Inquiry", "priority": "medium"}}\n'
+                        "```"
+                    )
+                elif "lookup_customer" in system_content:
+                    tool_calls = [{
+                        "tool_name": "lookup_customer",
+                        "arguments": {"customer_id": "cust_123"},
+                    }]
+                    content = (
+                        "```tool_request\n"
+                        '{"tool_name": "lookup_customer", "arguments": {"customer_id": "cust_123"}}\n'
+                        "```"
+                    )
+                else:
+                    content = f"I have received your request: '{user_content}'."
+            elif (
                 "<verified_fact" in system_content
                 or "VERIFIED BUSINESS FACTS" in system_content
                 or "VERIFIED BUSINESS KNOWLEDGE" in system_content
@@ -108,6 +143,7 @@ class MockLLMProvider:
             completion_tokens=len(content.split()),
             total_tokens=sum(len(m.content.split()) for m in messages) + len(content.split()),
             latency_ms=elapsed_ms,
+            tool_calls=tool_calls,
         )
 
 
