@@ -342,44 +342,49 @@ class VoicePipelineService:
         4. Transitions state machine: SPEAKING -> INTERRUPTED -> LISTENING.
         5. Notifies transport and updates telemetry.
         """
+        context = self._active_contexts.get(session_id)
+        if context:
+            async with context.lock:
+                session = await self.get_session(session_id, tenant_id)
+                if session.status in (VoiceSessionStatus.ENDED.value, VoiceSessionStatus.FAILED.value):
+                    raise VoiceSessionStateError(
+                        message=f"Cannot interrupt a session with terminal status '{session.status}'.",
+                        details={"session_id": str(session_id), "status": session.status},
+                    )
+
+                # In-memory invalidation: bump generation and clear buffers
+                context.generation_id += 1
+                new_gen = context.generation_id
+                context.buffer.clear()
+                context.turn_detector.reset()
+
+                # Cancel in-flight turn task and synthesis task immediately
+                if context.current_turn_task and not context.current_turn_task.done():
+                    context.current_turn_task.cancel()
+                    logger.info("Cancelled active turn task for session %s", session_id)
+                if context.current_synthesizing_task and not context.current_synthesizing_task.done():
+                    context.current_synthesizing_task.cancel()
+                    logger.info("Cancelled active synthesis task for session %s", session_id)
+
+                return await self._execute_interrupt(session, session_id, tenant_id, reason, context, new_gen)
+
         session = await self.get_session(session_id, tenant_id)
         if session.status in (VoiceSessionStatus.ENDED.value, VoiceSessionStatus.FAILED.value):
             raise VoiceSessionStateError(
                 message=f"Cannot interrupt a session with terminal status '{session.status}'.",
                 details={"session_id": str(session_id), "status": session.status},
             )
-
-        context = self._active_contexts.get(session_id)
-        if context:
-            # 1. Immediate in-memory invalidation: bump generation and clear buffers
-            context.generation_id += 1
-            new_gen = context.generation_id
-            context.buffer.clear()
-            context.turn_detector.reset()
-
-            # 2. Cancel in-flight turn task and synthesis task immediately
-            if context.current_turn_task and not context.current_turn_task.done():
-                context.current_turn_task.cancel()
-                logger.info("Cancelled active turn task for session %s", session_id)
-            if context.current_synthesizing_task and not context.current_synthesizing_task.done():
-                context.current_synthesizing_task.cancel()
-                logger.info("Cancelled active synthesis task for session %s", session_id)
-
-            # 3. Synchronize DB update under lock
-            async with context.lock:
-                return await self._execute_interrupt(session_id, tenant_id, reason, context, new_gen)
-
-        return await self._execute_interrupt(session_id, tenant_id, reason, None, None)
+        return await self._execute_interrupt(session, session_id, tenant_id, reason, None, None)
 
     async def _execute_interrupt(
         self,
+        session: VoiceSession,
         session_id: uuid.UUID,
         tenant_id: uuid.UUID,
         reason: str,
         context: Optional[ActiveSessionContext],
         target_gen: Optional[int] = None,
     ) -> VoiceSession:
-        session = await self.get_session(session_id, tenant_id)
         old_gen = session.current_generation_id
         new_gen = max(old_gen + 1, target_gen or (old_gen + 1))
         session.current_generation_id = new_gen

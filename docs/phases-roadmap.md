@@ -132,10 +132,11 @@ Enable AI agents to execute actions (CRM sync, HTTP API calls, appointment booki
 ## Phase 6: Real-Time Voice Pipeline & Telemetry Engine (Completed ✅)
 
 ### Objective
-Construct the low-latency streaming voice pipeline capable of handling speech-to-text, text-to-speech, voice activity detection, barge-in interruptions, and multi-lingual voice streaming.
+Construct the low-latency streaming voice pipeline capable of handling speech-to-text, text-to-speech, voice activity detection, barge-in interruptions, and multi-lingual voice streaming across **English, Hindi, Telugu, Tamil, and Malayalam**.
 
 ### Deliverables & Modules
-- **Speech-to-Text (STT)**: Streaming WebSocket audio transcription supporting English, Hindi, Telugu, and Tamil.
+- **Supported Languages**: English (`en`), Hindi (`hi`), Telugu (`te`), Tamil (`ta`), and Malayalam (`ml`).
+- **Speech-to-Text (STT)**: Streaming WebSocket audio transcription.
 - **Text-to-Speech (TTS)**: Low-latency streaming voice synthesis with sentence chunking.
 - **Voice Activity Detection (VAD) & Turn Detection**: Real-time energy and model-based VAD to distinguish active speech from background noise.
 - **Barge-in Interruption Handler**: Immediate cancellation of TTS playback when user starts speaking mid-agent turn.
@@ -152,16 +153,24 @@ Construct the low-latency streaming voice pipeline capable of handling speech-to
 
 ---
 
-## Phase 7: Telephony Routing, Call Dispatcher & Analytics (Active Roadmap 🚀)
+## Phase 7: Telephony Routing, Call Dispatcher & Analytics (Completed ✅)
 
 ### Objective
-Connect the streaming voice runtime directly to PSTN/SIP telephony networks (Twilio, Vonage, Plivo) for inbound/outbound automated calling campaigns and real-time dashboard analytics.
+Connect the streaming voice runtime directly to PSTN/SIP telephony networks (Twilio, Vonage, Plivo) for inbound/outbound automated calling campaigns, lifecycle tracking, and real-time analytics.
 
-### Key Specifications
-- **Inbound/Outbound Telephony Webhooks**: Automated call connection via Twilio Media Streams & SIP trunks.
-- **Campaign Dispatcher**: Bulk outbound calling with scheduling, retries, and timezone rules.
-- **Call Recordings & Transcripts**: Automatic recording storage, transcript alignment, and sentiment scoring.
-- **Analytics Dashboard**: Real-time monitoring of active calls, latency distributions, conversion rates, and cost tracking.
+### Deliverables & Modules
+- **Telephony Provider Interface**: Pluggable vendor-neutral `TelephonyProviderInterface` with `TwilioTelephonyProvider` and `MockTelephonyProvider`.
+- **Inbound Call Webhooks**: Authenticated webhook processing, active agent resolution, TwiML Media Stream connection, and persistent `CallSession` creation.
+- **Outbound Call Dispatcher**: Outbound calling API enforcing tenant calling permissions, agent validation, idempotency, and retries.
+- **Call State Machine & Webhooks**: Real-time lifecycle tracking (`queued` -> `ringing` -> `in_progress` -> `completed`/`failed`) and voice pipeline session termination.
+- **Telephony Analytics Engine**: Call volume metrics, total/average call duration calculation, completion rates, and breakdown by direction.
+
+### Key Files & Endpoints
+- Endpoints: `POST /api/v1/telephony/inbound/webhook`, `POST /api/v1/telephony/outbound`, `POST /api/v1/telephony/status/webhook`, `GET /api/v1/telephony/calls/{id}`, `GET /api/v1/telephony/analytics`
+- [`backend/app/telephony/provider.py`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/backend/app/telephony/provider.py)
+- [`backend/app/telephony/service.py`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/backend/app/telephony/service.py)
+- [`backend/app/telephony/models.py`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/backend/app/telephony/models.py)
+- Migration: `0007_telephony_call_sessions.py`
 
 ---
 
@@ -176,4 +185,6 @@ Every phase contains corresponding pytest suites:
 | **Phase 3** | `test_knowledge_base_crud.py`, `test_document_ingestion_and_extraction.py`, `test_rag_retrieval_and_citations.py` | Knowledge & Grounding |
 | **Phase 4** | `test_agent_crud_and_lifecycle.py`, `test_agent_runtime_grounding_and_rag.py`, `test_agent_security_and_prompt_injection.py` | Agent Machine Engine |
 | **Phase 5** | `test_tool_crud_and_lifecycle.py`, `test_tool_execution_pipeline.py`, `test_tool_ssrf_and_security.py` | Sandbox & Tool Security |
-| **Phase 6** | `test_voice_pipeline_orchestration.py`, `test_voice_vad_and_turn_detection.py`, `test_voice_interruption_and_stale_audio.py` | Low-latency Voice & VAD |
+| **Phase 6** | `test_voice_pipeline_orchestration.py`, `test_voice_vad_and_turn_detection.py`, `test_voice_interruption_and_stale_audio.py`, `test_voice_hardening_and_adversarial.py` | Low-latency Voice, Concurrency & Security Gate |
+| **Phase 7** | `test_telephony_inbound_outbound.py` | Inbound/Outbound Telephony, Webhooks, Isolation & Analytics |
+

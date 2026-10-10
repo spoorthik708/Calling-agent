@@ -57,11 +57,18 @@ class Permission(str, Enum):
     TOOLS_READ_EXECUTIONS = "tools:read_executions"
 
     # Voice Layer permissions (Phase 6)
+    # Voice Layer permissions (Phase 6)
     VOICE_READ = "voice:read"
     VOICE_CREATE = "voice:create"
     VOICE_MANAGE = "voice:manage"
     VOICE_INTERRUPT = "voice:interrupt"
     VOICE_END = "voice:end"
+
+    # Telephony Layer permissions (Phase 7)
+    TELEPHONY_READ = "telephony:read"
+    TELEPHONY_CREATE = "telephony:create"
+    TELEPHONY_DISPATCH = "telephony:dispatch"
+    TELEPHONY_MANAGE = "telephony:manage"
 
 
 # Definitive Role -> Permissions Mapping
@@ -103,6 +110,10 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.VOICE_MANAGE,
         Permission.VOICE_INTERRUPT,
         Permission.VOICE_END,
+        Permission.TELEPHONY_READ,
+        Permission.TELEPHONY_CREATE,
+        Permission.TELEPHONY_DISPATCH,
+        Permission.TELEPHONY_MANAGE,
     }),
     Role.ADMIN: frozenset({
         Permission.TENANT_READ,
@@ -139,7 +150,10 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.VOICE_MANAGE,
         Permission.VOICE_INTERRUPT,
         Permission.VOICE_END,
-        # Note: ADMIN does NOT have TENANT_UPDATE or ROLES_MANAGE
+        Permission.TELEPHONY_READ,
+        Permission.TELEPHONY_CREATE,
+        Permission.TELEPHONY_DISPATCH,
+        Permission.TELEPHONY_MANAGE,
     }),
     Role.MEMBER: frozenset({
         Permission.TENANT_READ,
@@ -157,6 +171,9 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.VOICE_CREATE,
         Permission.VOICE_INTERRUPT,
         Permission.VOICE_END,
+        Permission.TELEPHONY_READ,
+        Permission.TELEPHONY_CREATE,
+        Permission.TELEPHONY_DISPATCH,
     }),
 }
 

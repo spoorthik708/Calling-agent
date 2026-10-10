@@ -2,7 +2,7 @@
 
 > **Enterprise AI Conversational Voice Agent SaaS Platform**
 
-YAVURA enables businesses to deploy AI-powered conversational voice agents capable of conducting natural, human-like inbound and outbound phone calls across **English, Hindi, Telugu, and Tamil**.
+YAVURA enables businesses to deploy AI-powered conversational voice agents capable of conducting natural, human-like inbound and outbound phone calls across **English, Hindi, Telugu, Tamil, and Malayalam**.
 
 ---
 
@@ -33,8 +33,8 @@ For full detailed documentation on all architecture phases, endpoints, and test 
 | **Phase 3** | **Knowledge & RAG Engine** | PDF/TXT document ingestion, semantic chunking, embeddings, RAG retrieval & factual verifier | Completed ✅ |
 | **Phase 4** | **AI Agent Engine** | Provider-agnostic LLM interface, state machine turn manager, memory truncation & prompt defense | Completed ✅ |
 | **Phase 5** | **Secure Action Sandbox** | Tool registry, HTTP integration sandbox, SSRF IP-range protection & execution audit logs | Completed ✅ |
-| **Phase 6** | **Real-Time Voice Pipeline** | Streaming STT/TTS (En, Hi, Te, Ta), VAD, barge-in cancellation & latency telemetry | Completed ✅ |
-| **Phase 7** | **Telephony & Analytics** | Twilio/SIP inbound/outbound call dispatcher, campaign scheduler & analytics dashboard | Active Roadmap 🚀 |
+| **Phase 6** | **Real-Time Voice Pipeline** | Streaming STT/TTS (En, Hi, Te, Ta, Ml), VAD, barge-in cancellation & latency telemetry | Completed ✅ |
+| **Phase 7** | **Telephony & Analytics** | Twilio/SIP inbound/outbound call dispatcher, webhooks, lifecycle state tracking & analytics | Completed ✅ |
 
 ---
 

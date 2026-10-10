@@ -18,12 +18,14 @@ class VoiceLanguage(str, Enum):
     HINDI = "hi"
     TELUGU = "te"
     TAMIL = "ta"
+    MALAYALAM = "ml"
 
     # Convenient short aliases
     EN = "en"
     HI = "hi"
     TE = "te"
     TA = "ta"
+    ML = "ml"
 
 
 SUPPORTED_VOICE_LANGUAGES: Set[str] = {
@@ -31,6 +33,7 @@ SUPPORTED_VOICE_LANGUAGES: Set[str] = {
     VoiceLanguage.HINDI.value,
     VoiceLanguage.TELUGU.value,
     VoiceLanguage.TAMIL.value,
+    VoiceLanguage.MALAYALAM.value,
 }
 
 

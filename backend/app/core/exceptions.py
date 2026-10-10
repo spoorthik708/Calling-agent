@@ -197,6 +197,25 @@ class VoiceRateLimitError(YavuraBaseException):
     pass
 
 
+# ==========================================
+# Telephony Domain Exceptions (Phase 7)
+# ==========================================
+
+class CallSessionNotFoundError(EntityNotFoundError):
+    """Raised when a call session is not found in the tenant context."""
+    pass
+
+
+class TelephonyProviderError(YavuraBaseException):
+    """Raised when PSTN/SIP telephony vendor API fails or invalid parameters supplied."""
+    pass
+
+
+class TelephonyPermissionError(YavuraBaseException):
+    """Raised when user or tenant lacks calling permissions."""
+    pass
+
+
 def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
     """Maps domain exceptions to appropriate HTTPExceptions."""
     if isinstance(exc, (VoiceSessionNotFoundError, EntityNotFoundError)):
