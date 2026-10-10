@@ -22,7 +22,23 @@ If verified business knowledge is available, the agent explains it naturally. If
 
 ---
 
-## 2. Technology Stack
+## 2. Implementation Phases & Architecture Roadmap
+
+For full detailed documentation on all architecture phases, endpoints, and test suites, see [docs/phases-roadmap.md](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/docs/phases-roadmap.md).
+
+| Phase | Module Name | Core Deliverables | Status |
+| :--- | :--- | :--- | :--- |
+| **Phase 1** | **Production Foundation** | Multi-tenant Async FastAPI, PostgreSQL + `pgvector`, Docker Compose, Security baseline | Completed ✅ |
+| **Phase 2** | **Auth, Tenant & RBAC** | Argon2/JWT auth, refresh tokens, role-based authorization (`Admin`, `Manager`, `Operator`), rate limiting | Completed ✅ |
+| **Phase 3** | **Knowledge & RAG Engine** | PDF/TXT document ingestion, semantic chunking, embeddings, RAG retrieval & factual verifier | Completed ✅ |
+| **Phase 4** | **AI Agent Engine** | Provider-agnostic LLM interface, state machine turn manager, memory truncation & prompt defense | Completed ✅ |
+| **Phase 5** | **Secure Action Sandbox** | Tool registry, HTTP integration sandbox, SSRF IP-range protection & execution audit logs | Completed ✅ |
+| **Phase 6** | **Real-Time Voice Pipeline** | Streaming STT/TTS (En, Hi, Te, Ta), VAD, barge-in cancellation & latency telemetry | Completed ✅ |
+| **Phase 7** | **Telephony & Analytics** | Twilio/SIP inbound/outbound call dispatcher, campaign scheduler & analytics dashboard | Active Roadmap 🚀 |
+
+---
+
+## 3. Technology Stack
 
 - **Backend**: Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy 2.0 (Async), Alembic, `asyncpg`, `aiosqlite`
 - **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS
