@@ -317,6 +317,18 @@ class TelephonyService:
         call.updated_at = now
         await self.db.commit()
         await self.db.refresh(call)
+
+        try:
+            from app.telephony.worker import CampaignWorkerService
+            worker = CampaignWorkerService(self.db)
+            await worker.update_target_from_call_session(
+                provider_call_id=provider_call_id,
+                call_status=new_status.value,
+                error_message=error_message,
+            )
+        except Exception as exc:
+            logger.warning("Error updating campaign target for call %s: %s", provider_call_id, exc)
+
         return call
 
     async def create_campaign(
@@ -413,6 +425,17 @@ class TelephonyService:
             custom_parameters=custom_parameters or {},
         )
         self.db.add(campaign)
+        await self.db.flush()
+
+        from app.telephony.worker import CampaignWorkerService
+        worker = CampaignWorkerService(self.db)
+        await worker.initialize_campaign_targets(
+            campaign_id=campaign.id,
+            tenant_id=tenant_id,
+            target_phones=resolved_target_phones,
+            max_retries=custom_parameters.get("max_retries", 3) if custom_parameters else 3,
+        )
+
         await self.db.commit()
         await self.db.refresh(campaign)
         return campaign

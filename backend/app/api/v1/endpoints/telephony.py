@@ -270,6 +270,104 @@ async def cancel_campaign(
     current_user: User = Depends(require_permission(Permission.TELEPHONY_DISPATCH.value)),
     db: AsyncSession = Depends(get_db),
 ) -> CampaignResponse:
-    service = TelephonyService(db)
-    campaign = await service.cancel_campaign(campaign_id, current_user.tenant_id)
+    from app.telephony.worker import CampaignWorkerService
+    worker = CampaignWorkerService(db)
+    campaign = await worker.cancel_campaign(campaign_id, current_user.tenant_id)
     return CampaignResponse.model_validate(campaign, from_attributes=True)
+
+
+@router.post(
+    "/campaigns/{campaign_id}/pause",
+    response_model=CampaignResponse,
+    summary="Pause Campaign",
+    description="Pauses an active calling campaign.",
+)
+async def pause_campaign(
+    campaign_id: uuid.UUID,
+    current_user: User = Depends(require_permission(Permission.TELEPHONY_DISPATCH.value)),
+    db: AsyncSession = Depends(get_db),
+) -> CampaignResponse:
+    from app.telephony.worker import CampaignWorkerService
+    worker = CampaignWorkerService(db)
+    campaign = await worker.pause_campaign(campaign_id, current_user.tenant_id)
+    return CampaignResponse.model_validate(campaign, from_attributes=True)
+
+
+@router.post(
+    "/campaigns/{campaign_id}/resume",
+    response_model=CampaignResponse,
+    summary="Resume Campaign",
+    description="Resumes a paused calling campaign.",
+)
+async def resume_campaign(
+    campaign_id: uuid.UUID,
+    current_user: User = Depends(require_permission(Permission.TELEPHONY_DISPATCH.value)),
+    db: AsyncSession = Depends(get_db),
+) -> CampaignResponse:
+    from app.telephony.worker import CampaignWorkerService
+    worker = CampaignWorkerService(db)
+    campaign = await worker.resume_campaign(campaign_id, current_user.tenant_id)
+    return CampaignResponse.model_validate(campaign, from_attributes=True)
+
+
+@router.post(
+    "/campaigns/{campaign_id}/retry-failed",
+    response_model=CampaignResponse,
+    summary="Retry Failed Campaign Targets",
+    description="Resets failed target calls back to queued status for safe retry.",
+)
+async def retry_failed_campaign_targets(
+    campaign_id: uuid.UUID,
+    current_user: User = Depends(require_permission(Permission.TELEPHONY_DISPATCH.value)),
+    db: AsyncSession = Depends(get_db),
+) -> CampaignResponse:
+    from app.telephony.worker import CampaignWorkerService
+    worker = CampaignWorkerService(db)
+    campaign = await worker.retry_failed_targets(campaign_id, current_user.tenant_id)
+    return CampaignResponse.model_validate(campaign, from_attributes=True)
+
+
+from app.telephony.schemas import CampaignTargetResponse
+from sqlalchemy import select
+from app.telephony.models import CampaignTarget
+
+@router.get(
+    "/campaigns/{campaign_id}/targets",
+    response_model=List[CampaignTargetResponse],
+    summary="List Campaign Targets",
+    description="Lists target call records and attempts for a specific campaign with tenant isolation.",
+)
+async def list_campaign_targets(
+    campaign_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> List[CampaignTargetResponse]:
+    service = TelephonyService(db)
+    await service.get_campaign(campaign_id, current_user.tenant_id)
+
+    stmt = (
+        select(CampaignTarget)
+        .where(
+            CampaignTarget.campaign_id == campaign_id,
+            CampaignTarget.tenant_id == current_user.tenant_id,
+        )
+        .order_by(CampaignTarget.created_at.asc())
+    )
+    res = await db.execute(stmt)
+    targets = list(res.scalars().all())
+    return [CampaignTargetResponse.model_validate(t, from_attributes=True) for t in targets]
+
+
+@router.post(
+    "/worker/process",
+    summary="Trigger Campaign Worker Batch Process",
+    description="Triggers durable campaign target batch processing and dispatching.",
+)
+async def trigger_worker_batch(
+    current_user: User = Depends(require_permission(Permission.TELEPHONY_DISPATCH.value)),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    from app.telephony.worker import CampaignWorkerService
+    worker = CampaignWorkerService(db)
+    dispatched = await worker.dispatch_pending_targets(batch_size=10)
+    return {"status": "ok", "dispatched_count": dispatched}

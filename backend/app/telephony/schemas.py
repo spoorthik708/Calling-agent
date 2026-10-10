@@ -81,12 +81,30 @@ class CampaignResponse(BaseModel):
     target_phones: List[str]
     completed_count: int
     failed_count: int
+    skipped_count: int = 0
     total_count: int
     scheduled_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+
+class CampaignTargetResponse(BaseModel):
+    id: uuid.UUID
+    campaign_id: uuid.UUID
+    tenant_id: uuid.UUID
+    phone_number: str
+    status: str
+    attempts: int
+    max_retries: int
+    provider_call_id: Optional[str] = None
+    last_error: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    next_retry_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    created_at: datetime
 
 
 class TelephonyAnalyticsResponse(BaseModel):

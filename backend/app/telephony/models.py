@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import uuid
 from typing import Any, Dict, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -184,6 +184,11 @@ class Campaign(Base, TenantAwareModel):
         default=0,
         nullable=False,
     )
+    skipped_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
     total_count: Mapped[int] = mapped_column(
         Integer,
         default=0,
@@ -221,4 +226,90 @@ class Campaign(Base, TenantAwareModel):
     __table_args__ = (
         Index("ix_telephony_campaigns_tenant_status", "tenant_id", "status"),
         Index("ix_telephony_campaigns_tenant_created", "tenant_id", "created_at"),
+    )
+
+
+class CampaignTarget(Base, TenantAwareModel):
+    """
+    CampaignTarget model representing an individual target phone record within a campaign.
+    Tracks persistent execution state machine (queued, in_progress, completed, failed,
+    skipped_opt_out, cancelled), attempt counts, exponential backoff timestamps,
+    and provider call identifiers across application restarts and worker crashes.
+    """
+
+    __tablename__ = "telephony_campaign_targets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("telephony_campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    phone_number: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default="queued",
+        nullable=False,
+        index=True,
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    max_retries: Mapped[int] = mapped_column(
+        Integer,
+        default=3,
+        nullable=False,
+    )
+    provider_call_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+    )
+    last_error: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    scheduled_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    next_retry_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    ended_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "phone_number", name="uq_campaign_target_phone"),
+        Index("ix_campaign_targets_tenant_status", "tenant_id", "status"),
+        Index("ix_campaign_targets_next_retry", "status", "next_retry_at"),
     )
