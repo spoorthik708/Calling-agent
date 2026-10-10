@@ -224,6 +224,72 @@ class Settings(BaseSettings):
         description="Maximum allowed validated redirect hops for HTTP tools",
     )
 
+    # Phase 6: Production Voice Layer Settings
+    DEFAULT_STT_PROVIDER: str = Field(
+        default="mock",
+        description="Default Speech-to-Text provider (e.g. 'deepgram', 'whisper', 'mock')",
+    )
+    DEFAULT_TTS_PROVIDER: str = Field(
+        default="mock",
+        description="Default Text-to-Speech provider (e.g. 'elevenlabs', 'cartesia', 'mock')",
+    )
+    DEFAULT_VAD_PROVIDER: str = Field(
+        default="energy",
+        description="Default Voice Activity Detection provider ('energy', 'webrtc', 'mock')",
+    )
+    VOICE_TRANSCRIPT_RETENTION_ENABLED: bool = Field(
+        default=True,
+        description="Whether finalized voice transcripts are persisted to conversation memory",
+    )
+    VOICE_AUDIO_RETENTION_ENABLED: bool = Field(
+        default=False,
+        description="Privacy invariant: Whether raw audio frames are stored (default False, ephemeral)",
+    )
+    MAX_AUDIO_CHUNK_BYTES: int = Field(
+        default=64 * 1024,
+        description="Maximum allowed single audio chunk size in bytes (64KB default)",
+    )
+    MAX_AUDIO_BUFFER_BYTES: int = Field(
+        default=5 * 1024 * 1024,
+        description="Maximum allowed accumulated audio buffer per turn (5MB default)",
+    )
+    MAX_AUDIO_QUEUE_SIZE: int = Field(
+        default=100,
+        description="Maximum capacity of asynchronous audio frame queues before backpressure",
+    )
+    MAX_TURN_DURATION_SECONDS: float = Field(
+        default=30.0,
+        description="Maximum duration of continuous speech permitted in a single turn",
+    )
+    DEFAULT_SILENCE_TIMEOUT_SECONDS: float = Field(
+        default=1.0,
+        description="Duration of silence required to detect turn completion",
+    )
+    DEFAULT_MIN_SPEECH_DURATION_SECONDS: float = Field(
+        default=0.2,
+        description="Minimum duration of speech required to register speech start",
+    )
+    STT_TIMEOUT_SECONDS: float = Field(
+        default=10.0,
+        description="Bounded timeout for speech-to-text transcription",
+    )
+    TTS_TIMEOUT_SECONDS: float = Field(
+        default=10.0,
+        description="Bounded timeout for speech synthesis",
+    )
+    LLM_STREAM_TIMEOUT_SECONDS: float = Field(
+        default=15.0,
+        description="Bounded timeout for streaming LLM generation chunks",
+    )
+    VOICE_SESSION_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=30,
+        description="Rate limit on voice session creation per tenant per minute",
+    )
+    VOICE_AUDIO_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=600,
+        description="Rate limit on audio chunk ingestion per tenant per minute",
+    )
+
     @model_validator(mode="after")
     def validate_knowledge_and_retrieval_settings(self) -> "Settings":
         if self.RETRIEVAL_MIN_SIMILARITY > self.RETRIEVAL_CONFIDENCE_THRESHOLD:
@@ -245,6 +311,16 @@ class Settings(BaseSettings):
             )
         if self.DEFAULT_LLM_PROVIDER.lower() == "openai" and not self.OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY must be provided when DEFAULT_LLM_PROVIDER is 'openai'")
+        if self.is_production and self.DEFAULT_STT_PROVIDER.lower() == "mock":
+            raise ValueError(
+                "Mock STT provider is strictly prohibited in production. "
+                "Configure a valid DEFAULT_STT_PROVIDER."
+            )
+        if self.is_production and self.DEFAULT_TTS_PROVIDER.lower() == "mock":
+            raise ValueError(
+                "Mock TTS provider is strictly prohibited in production. "
+                "Configure a valid DEFAULT_TTS_PROVIDER."
+            )
         return self
 
     @property

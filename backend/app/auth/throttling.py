@@ -38,6 +38,10 @@ class InMemoryRateLimiter(RateLimiterInterface):
             self._attempts[key] = valid_attempts
             return True
 
+    def clear(self) -> None:
+        with self._lock:
+            self._attempts.clear()
+
 
 # Global default instance
 default_rate_limiter = InMemoryRateLimiter()

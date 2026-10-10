@@ -56,6 +56,13 @@ class Permission(str, Enum):
     TOOLS_EXECUTE = "tools:execute"
     TOOLS_READ_EXECUTIONS = "tools:read_executions"
 
+    # Voice Layer permissions (Phase 6)
+    VOICE_READ = "voice:read"
+    VOICE_CREATE = "voice:create"
+    VOICE_MANAGE = "voice:manage"
+    VOICE_INTERRUPT = "voice:interrupt"
+    VOICE_END = "voice:end"
+
 
 # Definitive Role -> Permissions Mapping
 ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
@@ -91,6 +98,11 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.TOOLS_ASSIGN,
         Permission.TOOLS_EXECUTE,
         Permission.TOOLS_READ_EXECUTIONS,
+        Permission.VOICE_READ,
+        Permission.VOICE_CREATE,
+        Permission.VOICE_MANAGE,
+        Permission.VOICE_INTERRUPT,
+        Permission.VOICE_END,
     }),
     Role.ADMIN: frozenset({
         Permission.TENANT_READ,
@@ -122,6 +134,11 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.TOOLS_ASSIGN,
         Permission.TOOLS_EXECUTE,
         Permission.TOOLS_READ_EXECUTIONS,
+        Permission.VOICE_READ,
+        Permission.VOICE_CREATE,
+        Permission.VOICE_MANAGE,
+        Permission.VOICE_INTERRUPT,
+        Permission.VOICE_END,
         # Note: ADMIN does NOT have TENANT_UPDATE or ROLES_MANAGE
     }),
     Role.MEMBER: frozenset({
@@ -136,6 +153,10 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.CONVERSATIONS_CREATE,
         Permission.TOOLS_READ,
         Permission.TOOLS_READ_EXECUTIONS,
+        Permission.VOICE_READ,
+        Permission.VOICE_CREATE,
+        Permission.VOICE_INTERRUPT,
+        Permission.VOICE_END,
     }),
 }
 

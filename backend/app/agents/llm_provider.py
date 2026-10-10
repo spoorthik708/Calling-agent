@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, runtime_checkable
 
 import httpx
 
@@ -17,6 +17,14 @@ logger = logging.getLogger(__name__)
 class LLMMessage:
     role: str  # "system", "user", "assistant"
     content: str
+
+
+@dataclass
+class LLMStreamChunk:
+    text: str = ""
+    tool_call_delta: Optional[Dict[str, Any]] = None
+    finish_reason: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -47,6 +55,17 @@ class LLMProvider(Protocol):
         max_output_tokens: int = 1024,
         timeout_seconds: float = 30.0,
     ) -> LLMResponse:
+        ...
+
+    def stream_response(
+        self,
+        *,
+        messages: List[LLMMessage],
+        model: str,
+        temperature: float = 0.2,
+        max_output_tokens: int = 1024,
+        timeout_seconds: float = 30.0,
+    ) -> AsyncIterator[LLMStreamChunk]:
         ...
 
 
@@ -146,6 +165,39 @@ class MockLLMProvider:
             tool_calls=tool_calls,
         )
 
+    async def stream_response(
+        self,
+        *,
+        messages: List[LLMMessage],
+        model: str,
+        temperature: float = 0.2,
+        max_output_tokens: int = 1024,
+        timeout_seconds: float = 30.0,
+    ) -> AsyncIterator[LLMStreamChunk]:
+        settings = get_settings()
+        if settings.is_production:
+            raise LLMProviderError(
+                message="MockLLMProvider is strictly prohibited in production mode.",
+                code="MOCK_PROVIDER_PROHIBITED",
+            )
+
+        resp = await self.generate(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            timeout_seconds=timeout_seconds,
+        )
+        words = resp.content.split(" ")
+        for i, word in enumerate(words):
+            chunk_text = word if i == len(words) - 1 else word + " "
+            finish_reason = "stop" if i == len(words) - 1 else None
+            yield LLMStreamChunk(
+                text=chunk_text,
+                finish_reason=finish_reason,
+                metadata={"provider": "mock", "index": i},
+            )
+
 
 class OpenAILLMProvider:
     """
@@ -231,6 +283,81 @@ class OpenAILLMProvider:
             logger.error("OpenAI network connection error: %s", str(exc))
             raise LLMProviderError(
                 message=f"LLM provider network error: {str(exc)}",
+                code="PROVIDER_NETWORK_ERROR",
+            )
+
+    async def stream_response(
+        self,
+        *,
+        messages: List[LLMMessage],
+        model: str,
+        temperature: float = 0.2,
+        max_output_tokens: int = 1024,
+        timeout_seconds: float = 30.0,
+    ) -> AsyncIterator[LLMStreamChunk]:
+        if not self.api_key:
+            raise LLMProviderError(
+                message="OpenAI API key is not configured on the server.",
+                code="PROVIDER_CREDENTIALS_MISSING",
+            )
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": model,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "temperature": temperature,
+            "max_tokens": max_output_tokens,
+            "stream": True,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url.rstrip('/')}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                ) as response:
+                    if response.status_code != 200:
+                        content = await response.aread()
+                        raise LLMProviderError(
+                            message=f"OpenAI stream failed: {response.status_code} - {content.decode()}",
+                            code="PROVIDER_API_ERROR",
+                        )
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[len("data: "):].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            choices = data_json.get("choices", [])
+                            if not choices:
+                                continue
+                            choice = choices[0]
+                            delta = choice.get("delta", {})
+                            content_delta = delta.get("content", "")
+                            finish_reason = choice.get("finish_reason")
+                            if content_delta or finish_reason:
+                                yield LLMStreamChunk(
+                                    text=content_delta or "",
+                                    finish_reason=finish_reason,
+                                    metadata={"id": data_json.get("id")},
+                                )
+                        except json.JSONDecodeError:
+                            continue
+        except httpx.TimeoutException:
+            raise LLMProviderError(
+                message=f"LLM streaming request timed out after {timeout_seconds} seconds.",
+                code="PROVIDER_TIMEOUT",
+            )
+        except httpx.RequestError as exc:
+            raise LLMProviderError(
+                message=f"LLM streaming network error: {str(exc)}",
                 code="PROVIDER_NETWORK_ERROR",
             )
 

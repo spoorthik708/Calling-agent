@@ -148,9 +148,83 @@ class ToolIdempotencyConflictError(YavuraBaseException):
     pass
 
 
+# ==========================================
+# Voice Domain Exceptions (Phase 6)
+# ==========================================
+
+class VoiceSessionNotFoundError(EntityNotFoundError):
+    """Raised when a voice session is not found in the tenant context."""
+    pass
+
+
+class VoiceSessionStateError(YavuraBaseException):
+    """Raised on invalid state transitions in the voice session state machine."""
+    pass
+
+
+class VoiceProviderError(YavuraBaseException):
+    """Raised when an external voice provider (STT/TTS) encounters an unrecoverable error."""
+    pass
+
+
+class VoiceConfigurationError(YavuraBaseException):
+    """Raised when voice provider configuration is invalid or missing required keys."""
+    pass
+
+
+class VoiceAudioFormatError(YavuraBaseException):
+    """Raised when audio frame metadata or payload format is malformed or inconsistent."""
+    pass
+
+
+class AudioBufferOverflowError(YavuraBaseException):
+    """Raised when audio buffer or queue exceeds configured memory boundaries."""
+    pass
+
+
+class STTTranscriptionError(YavuraBaseException):
+    """Raised when audio transcription fails."""
+    pass
+
+
+class TTSSynthesisError(YavuraBaseException):
+    """Raised when text-to-speech synthesis fails."""
+    pass
+
+
+class VoiceRateLimitError(YavuraBaseException):
+    """Raised when tenant exceeds voice session or audio ingestion rate limits."""
+    pass
+
+
 def http_exception_from_domain(exc: YavuraBaseException) -> HTTPException:
     """Maps domain exceptions to appropriate HTTPExceptions."""
-    if isinstance(exc, TenantIsolationError):
+    if isinstance(exc, (VoiceSessionNotFoundError, EntityNotFoundError)):
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "RESOURCE_NOT_FOUND", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, VoiceSessionStateError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "INVALID_STATE_TRANSITION", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, (AudioBufferOverflowError, VoiceConfigurationError, VoiceAudioFormatError)):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "VOICE_ERROR", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, VoiceRateLimitError):
+        return HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"code": "VOICE_RATE_LIMITED", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, (VoiceProviderError, STTTranscriptionError, TTSSynthesisError)):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "VOICE_PROVIDER_ERROR", "message": exc.message, "details": exc.details},
+        )
+    elif isinstance(exc, TenantIsolationError):
         return HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "TENANT_ACCESS_DENIED", "message": exc.message, "details": exc.details},

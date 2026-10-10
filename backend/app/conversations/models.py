@@ -24,6 +24,7 @@ from app.database.base import Base, GUID, TenantAwareModel, TimestampMixin
 class ConversationChannel(str, Enum):
     TEXT = "text"
     API = "api"
+    VOICE = "voice"
 
 
 class ConversationStatus(str, Enum):

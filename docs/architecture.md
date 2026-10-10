@@ -386,6 +386,7 @@ Initialized with SQLAlchemy 2.0 Declarative Models and Alembic migrations:
 - **`knowledge_bases`**, **`documents`**, **`document_versions`**, **`document_chunks`**, **`embeddings`**: Verified Knowledge & RAG foundation.
 - **`agents`**, **`agent_knowledge_bases`**, **`conversations`**, **`messages`**, **`idempotency_records`**: Conversational agent and runtime entities.
 - **`tool_definitions`**, **`agent_tools`**, **`tool_executions`**: Approved business capabilities, agent assignments, and execution audit trails.
+- **`voice_sessions`**: Real-time voice intelligence sessions with state machine, generation IDs, telemetry, and privacy controls.
 
 ---
 
@@ -410,6 +411,14 @@ Testing is built into the foundation from day one:
 - **`test_tool_ssrf_and_security.py`**: Validates SSRF blocking (private IPs, metadata, loopback, internal domains), injection rejection, and secret isolation.
 - **`test_tool_idempotency_and_resilience.py`**: Validates duplicate caching, conflict detection, timeouts, and bounded retries.
 - **`test_agent_runtime_tool_integration.py`**: Validates end-to-end agent turn tool loop, grounding on tool results, prompt injection neutralization in tool output, and loop limits.
+- **`test_voice_session_lifecycle.py`**: Validates voice session state machine transitions, invalid jump rejections, and DB persistence.
+- **`test_voice_audio_and_buffers.py`**: Validates audio frame serialization, duration calculations, bounded buffers, and overflow protection.
+- **`test_voice_providers_and_factories.py`**: Validates STT/TTS/VAD provider factory resolution, configuration options, and production mock rejection.
+- **`test_voice_vad_and_turn_detection.py`**: Validates energy-based VAD calculations, speech padding, silence timeouts, and turn event sequencing.
+- **`test_voice_text_chunking_and_streaming.py`**: Validates streaming token buffering, punctuation and clause chunking, and language handling (en, hi, te, ta).
+- **`test_voice_interruption_and_stale_audio.py`**: Validates barge-in cancellation, buffer discard, generation ID incrementation, and stale chunk dropping.
+- **`test_voice_api_rbac_and_security.py`**: Validates voice session CRUD, RBAC permissions (voice:read, voice:create, voice:manage, voice:interrupt, voice:end), tenant boundary isolation, and rate limiting.
+- **`test_voice_pipeline_orchestration.py`**: Validates end-to-end turn pipeline orchestration, verified RAG knowledge grounding in voice, tool execution integration, and privacy retention settings.
 
 ---
 
@@ -422,3 +431,9 @@ For comprehensive architecture details regarding agent configurations, explicit 
 ## 13. Phase 5: Production AI Tool & Action Layer Architecture
 
 For comprehensive architecture details regarding tool models, deterministic registry, 15-step execution pipeline, SSRF defenses, credential architecture, idempotency, timeouts, audit logging, and agent runtime integration, see [`docs/tool-runtime.md`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/docs/tool-runtime.md).
+
+---
+
+## 14. Phase 6: Production Real-Time Voice Intelligence Layer Architecture
+
+For comprehensive architecture details regarding channel-agnostic real-time voice streaming, bounded audio framing, turn detection, barge-in interruption, stale chunk filtering, multi-language support (en, hi, te, ta), and telemetry, see [`docs/voice-runtime.md`](file:///c:/Users/spoor/OneDrive/Desktop/ai%20calling%20agent/docs/voice-runtime.md).

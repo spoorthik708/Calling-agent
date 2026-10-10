@@ -7,6 +7,7 @@ from app.api.v1.endpoints.users import router as users_router
 from app.api.v1.endpoints.agents import router as agents_router
 from app.api.v1.endpoints.conversations import router as conversations_router
 from app.api.v1.endpoints.tools import router as tools_router
+from app.api.v1.endpoints.voice import router as voice_router
 
 api_v1_router = APIRouter()
 
@@ -19,3 +20,4 @@ api_v1_router.include_router(knowledge_router, prefix="", tags=["Knowledge & RAG
 api_v1_router.include_router(agents_router, prefix="", tags=["AI Agents"])
 api_v1_router.include_router(conversations_router, prefix="", tags=["Conversations & Runtime"])
 api_v1_router.include_router(tools_router, prefix="", tags=["AI Tools & Actions"])
+api_v1_router.include_router(voice_router, prefix="", tags=["Voice Intelligence Runtime"])

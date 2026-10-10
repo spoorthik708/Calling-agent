@@ -30,6 +30,8 @@ from app.tools.models import (
     ToolType,
     ToolExecutionStatus,
 )
+from app.voice.models import VoiceSession
+from app.voice.state import VoiceSessionStatus
 
 __all__ = [
     "Base",
@@ -59,4 +61,6 @@ __all__ = [
     "ToolExecution",
     "ToolType",
     "ToolExecutionStatus",
+    "VoiceSession",
+    "VoiceSessionStatus",
 ]
