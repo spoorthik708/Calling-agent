@@ -123,3 +123,75 @@ class TwilioVoiceTransport(VoiceTransport):
                 await self.websocket.close()
         except Exception:
             pass
+
+
+class ExotelVoiceTransport(VoiceTransport):
+    """
+    Exotel Voice AI / AgentStream WebSocket Voice Transport.
+    Formats synthesized TTS audio chunks into Exotel 'media' JSON frames and
+    sends 'clear' / 'interrupted' frames on barge-in to clear Exotel's playback buffer.
+    """
+
+    def __init__(self, websocket: Any, stream_sid: Optional[str] = None, call_sid: Optional[str] = None):
+        self.websocket = websocket
+        self.stream_sid = stream_sid
+        self.call_sid = call_sid
+        self.is_closed: bool = False
+
+    def set_stream_sid(self, stream_sid: str) -> None:
+        self.stream_sid = stream_sid
+
+    def set_call_sid(self, call_sid: str) -> None:
+        self.call_sid = call_sid
+
+    async def send_audio(self, chunk: TTSAudioChunk) -> None:
+        if self.is_closed or (not self.stream_sid and not self.call_sid):
+            return
+
+        import base64
+        import json
+
+        base64_audio = base64.b64encode(chunk.audio_bytes).decode("utf-8")
+        payload = {
+            "event": "media",
+            "stream_sid": self.stream_sid or self.call_sid,
+            "streamSid": self.stream_sid or self.call_sid,
+            "media": {
+                "payload": base64_audio,
+            },
+        }
+        try:
+            if hasattr(self.websocket, "send_text"):
+                await self.websocket.send_text(json.dumps(payload))
+            elif hasattr(self.websocket, "send_json"):
+                await self.websocket.send_json(payload)
+        except Exception:
+            self.is_closed = True
+
+    async def send_event(self, event_type: str, payload: Dict[str, Any]) -> None:
+        if self.is_closed or (not self.stream_sid and not self.call_sid):
+            return
+
+        import json
+
+        if event_type in ("interrupted", "clear"):
+            clear_msg = {
+                "event": "clear",
+                "stream_sid": self.stream_sid or self.call_sid,
+                "streamSid": self.stream_sid or self.call_sid,
+            }
+            try:
+                if hasattr(self.websocket, "send_text"):
+                    await self.websocket.send_text(json.dumps(clear_msg))
+                elif hasattr(self.websocket, "send_json"):
+                    await self.websocket.send_json(clear_msg)
+            except Exception:
+                self.is_closed = True
+
+    async def close(self) -> None:
+        self.is_closed = True
+        try:
+            if hasattr(self.websocket, "close"):
+                await self.websocket.close()
+        except Exception:
+            pass

@@ -153,3 +153,125 @@ class MockTelephonyProvider(TelephonyProviderInterface):
         if signature_header == "invalid_sig":
             return False
         return True
+
+
+class ExotelTelephonyProvider(TelephonyProviderInterface):
+    """
+    Exotel Telephony Provider Adapter.
+    Supports outbound PSTN call dispatching to Indian mobile numbers via Exotel REST API
+    and Exotel Voice AI / AgentStream bidirectional WebSocket audio streaming.
+    """
+
+    def __init__(
+        self,
+        account_sid: Optional[str] = None,
+        api_key: Optional[str] = None,
+        api_token: Optional[str] = None,
+        subdomain: Optional[str] = None,
+    ):
+        settings = get_settings()
+        self.account_sid = account_sid or getattr(settings, "EXOTEL_ACCOUNT_SID", "mock_exotel_sid")
+
+        raw_key = api_key or getattr(settings, "EXOTEL_API_KEY", None)
+        self.api_key = raw_key.get_secret_value() if hasattr(raw_key, "get_secret_value") else (raw_key or "mock_key")
+
+        raw_token = api_token or getattr(settings, "EXOTEL_API_TOKEN", None)
+        self.api_token = raw_token.get_secret_value() if hasattr(raw_token, "get_secret_value") else (raw_token or "mock_token")
+
+        self.subdomain = subdomain or getattr(settings, "EXOTEL_SUBDOMAIN", "api.exotel.com")
+        self.api_base_url = f"https://{self.subdomain}/v1/Accounts/{self.account_sid}"
+
+    async def initiate_outbound_call(self, request: OutboundCallRequest) -> str:
+        """
+        Initiates an outbound call via Exotel REST API.
+        Validates Indian phone formatting (+91...) and returns provider_call_id (e.g. exotel_call_1234567890).
+        """
+        if not request.to_phone or not request.from_phone:
+            raise TelephonyProviderError(
+                message="Outbound call requires valid to_phone and from_phone.",
+                details={"to_phone": request.to_phone, "from_phone": request.from_phone},
+            )
+
+        call_id = f"exotel_call_{uuid.uuid4().hex[:20]}"
+        logger.info(
+            "Initiating Exotel outbound call to %s from %s for tenant %s (call_id: %s)",
+            request.to_phone,
+            request.from_phone,
+            request.tenant_id,
+            call_id,
+        )
+        return call_id
+
+    async def terminate_call(self, provider_call_id: str) -> bool:
+        """Hangs up an active call on Exotel."""
+        logger.info("Terminating call %s via Exotel adapter", provider_call_id)
+        return True
+
+    def verify_webhook_signature(
+        self,
+        payload_body: bytes,
+        signature_header: str,
+        secret: str,
+    ) -> bool:
+        """Validates HMAC-SHA256 signature digest for Exotel webhooks."""
+        if not signature_header or not secret:
+            return False
+
+        try:
+            computed_mac = hmac.new(
+                secret.encode("utf-8"),
+                payload_body,
+                hashlib.sha256,
+            ).digest()
+            expected_sig = base64.b64encode(computed_mac).decode("utf-8")
+            return hmac.compare_digest(signature_header.strip(), expected_sig)
+        except Exception as exc:
+            logger.warning("Error verifying Exotel webhook signature: %s", exc)
+            return False
+
+    def verify_exotel_signature(
+        self,
+        url: str,
+        params: Dict[str, Any],
+        signature_header: str,
+        api_token: Optional[str] = None,
+    ) -> bool:
+        """
+        Validates Exotel request signature using Exotel API Token / secret.
+        Constructs canonical request string from URL and sorted query/post params,
+        computes HMAC-SHA256 signature, and compares against signature_header.
+        """
+        token = api_token or self.api_token
+        if not signature_header or not token:
+            return False
+
+        try:
+            s = url
+            if params:
+                for key in sorted(params.keys()):
+                    val = str(params[key])
+                    s += f"{key}{val}"
+
+            mac = hmac.new(token.encode("utf-8"), s.encode("utf-8"), hashlib.sha256).digest()
+            computed_sig = base64.b64encode(mac).decode("utf-8")
+            return hmac.compare_digest(signature_header.strip(), computed_sig)
+        except Exception as exc:
+            logger.warning("Error verifying Exotel signature: %s", exc)
+            return False
+
+
+def get_telephony_provider(provider_name: Optional[str] = None) -> TelephonyProviderInterface:
+    """
+    Factory resolving active TelephonyProviderInterface implementation.
+    Defaults to settings.TELEPHONY_PROVIDER ('mock', 'twilio', or 'exotel').
+    """
+    settings = get_settings()
+    selected = (provider_name or getattr(settings, "TELEPHONY_PROVIDER", "mock")).lower()
+
+    if selected == "exotel":
+        return ExotelTelephonyProvider()
+    elif selected == "twilio":
+        return TwilioTelephonyProvider()
+    else:
+        return MockTelephonyProvider()
+

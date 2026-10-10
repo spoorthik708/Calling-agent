@@ -117,6 +117,120 @@ async def call_status_webhook(
     return {"status": "ok"}
 
 
+@router.post(
+    "/exotel/status",
+    summary="Exotel Call Status Webhook",
+    description="Processes real-time Exotel call status webhooks (ringing, answered, completed, busy, failed).",
+)
+async def exotel_call_status_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, str]:
+    service = TelephonyService(db)
+    form_data = await request.form()
+    body_params = dict(form_data)
+
+    provider_call_id = body_params.get("CallSid") or body_params.get("Sid") or body_params.get("provider_call_id")
+    raw_status = (body_params.get("Status") or body_params.get("status") or "").lower()
+    error_msg = body_params.get("DetailedStatus") or body_params.get("error_message")
+    duration_str = body_params.get("CallDuration") or body_params.get("duration")
+
+    duration_sec = int(duration_str) if duration_str and str(duration_str).isdigit() else None
+    recording_url = body_params.get("RecordingUrl") or body_params.get("recording_url")
+
+    status_map = {
+        "completed": CallState.COMPLETED,
+        "failed": CallState.FAILED,
+        "busy": CallState.BUSY,
+        "no-answer": CallState.NO_ANSWER,
+        "no_answer": CallState.NO_ANSWER,
+        "in-progress": CallState.IN_PROGRESS,
+        "in_progress": CallState.IN_PROGRESS,
+        "ringing": CallState.RINGING,
+    }
+    call_state = status_map.get(raw_status, CallState.FAILED)
+
+    if provider_call_id:
+        await service.update_call_status(
+            provider_call_id=str(provider_call_id),
+            new_status=call_state,
+            error_message=str(error_msg) if error_msg else None,
+            duration_seconds=duration_sec,
+            recording_url=str(recording_url) if recording_url else None,
+        )
+
+    return {"status": "ok"}
+
+
+from fastapi import WebSocket, WebSocketDisconnect
+from app.voice.pipeline import VoicePipelineService
+from app.voice.transport import ExotelVoiceTransport
+
+@router.websocket("/exotel/stream")
+async def exotel_voice_stream(
+    websocket: WebSocket,
+    session_id: uuid.UUID = Query(...),
+    tenant_id: uuid.UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Exotel Voice AI / AgentStream WebSocket Endpoint.
+    Bridges Exotel bidirectional audio stream to VoicePipelineService.
+    """
+    await websocket.accept()
+    transport = ExotelVoiceTransport(websocket)
+    pipeline = VoicePipelineService(db)
+
+    try:
+        await pipeline.start_session(session_id, tenant_id, transport=transport)
+        seq = 0
+
+        while True:
+            msg = await websocket.receive()
+            if "text" in msg and msg["text"]:
+                import json
+                try:
+                    data = json.loads(msg["text"])
+                    event_type = data.get("event")
+
+                    if event_type in ("start", "connected"):
+                        stream_sid = data.get("stream_sid") or data.get("streamSid") or data.get("call_sid")
+                        if stream_sid:
+                            transport.set_stream_sid(stream_sid)
+                    elif event_type == "media":
+                        payload_b64 = data.get("media", {}).get("payload", "") or data.get("payload", "")
+                        if payload_b64:
+                            import base64
+                            from app.voice.audio import AudioFrame
+                            audio_bytes = base64.b64decode(payload_b64)
+                            frame = AudioFrame(payload=audio_bytes, sequence=seq)
+                            seq += 1
+                            await pipeline.ingest_audio(session_id=session_id, tenant_id=tenant_id, frame=frame)
+                    elif event_type in ("stop", "disconnect", "end"):
+                        await pipeline.end_session(session_id=session_id, tenant_id=tenant_id, reason="exotel_stream_stop")
+                        break
+                except Exception as parse_err:
+                    logger.warning("Error processing Exotel WS event: %s", parse_err)
+            elif "bytes" in msg and msg["bytes"]:
+                from app.voice.audio import AudioFrame
+                frame = AudioFrame(payload=msg["bytes"], sequence=seq)
+                seq += 1
+                await pipeline.ingest_audio(session_id=session_id, tenant_id=tenant_id, frame=frame)
+
+    except WebSocketDisconnect:
+        logger.info("Exotel WS disconnected for session %s", session_id)
+        try:
+            await pipeline.end_session(session_id=session_id, tenant_id=tenant_id, reason="ws_disconnect")
+        except Exception:
+            pass
+    except Exception as exc:
+        logger.error("Error in exotel_voice_stream: %s", exc, exc_info=True)
+        try:
+            await pipeline.end_session(session_id=session_id, tenant_id=tenant_id, reason="ws_error")
+        except Exception:
+            pass
+
+
 @router.get(
     "/calls/{call_id}",
     response_model=CallSessionResponse,

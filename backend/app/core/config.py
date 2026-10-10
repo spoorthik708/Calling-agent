@@ -85,8 +85,19 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[SecretStr] = None
 
     # Telephony Provider Settings (Abstracted)
-    TELEPHONY_PROVIDER: str = "mock"
+    TELEPHONY_PROVIDER: str = Field(default="mock", description="mock, twilio, exotel")
     TELEPHONY_WEBHOOK_SECRET: Optional[SecretStr] = None
+    TWILIO_ACCOUNT_SID: str = Field(default="mock_twilio_sid")
+    TWILIO_AUTH_TOKEN: Optional[SecretStr] = None
+    EXOTEL_ACCOUNT_SID: str = Field(default="mock_exotel_sid")
+    EXOTEL_API_KEY: Optional[SecretStr] = None
+    EXOTEL_API_TOKEN: Optional[SecretStr] = None
+    EXOTEL_SUBDOMAIN: str = Field(default="api.exotel.com")
+    EXOTEL_SIGNATURE_SECRET: Optional[SecretStr] = None
+    EXOTEL_OUTBOUND_PROMOTIONAL_SERIES: str = Field(
+        default="140",
+        description="TRAI mandated 140-series prefix for Indian promotional commercial communications",
+    )
 
     # Reverse Proxy & Rate Limiting (SEC-06)
     TRUST_PROXY_HEADERS: bool = Field(

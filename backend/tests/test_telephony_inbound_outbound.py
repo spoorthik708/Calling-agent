@@ -134,7 +134,7 @@ async def test_outbound_call_dispatch_flow(async_client: AsyncClient, telephony_
     assert data["agent_id"] == str(agent.id)
     assert data["status"] == CallState.RINGING.value
     assert data["direction"] == CallDirection.OUTBOUND.value
-    assert data["provider_call_id"].startswith("CA")
+    assert any(data["provider_call_id"].startswith(prefix) for prefix in ("CA", "mock_call_", "exotel_call_"))
 
 
 @pytest.mark.asyncio

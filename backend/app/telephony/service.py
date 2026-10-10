@@ -32,7 +32,7 @@ from app.telephony.interfaces import (
     TelephonyProviderInterface,
 )
 from app.telephony.models import CallSession
-from app.telephony.provider import TwilioTelephonyProvider
+from app.telephony.provider import ExotelTelephonyProvider, TwilioTelephonyProvider, get_telephony_provider
 from app.voice.pipeline import VoicePipelineService
 from app.voice.state import VoiceSessionStatus
 
@@ -52,8 +52,8 @@ class TelephonyService:
         provider: Optional[TelephonyProviderInterface] = None,
     ):
         self.db = db
-        self.provider = provider or TwilioTelephonyProvider()
         self.settings = get_settings()
+        self.provider = provider or get_telephony_provider()
 
     async def get_call_session(
         self,
