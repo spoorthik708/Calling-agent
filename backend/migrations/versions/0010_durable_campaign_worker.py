@@ -18,7 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # 1. Add skipped_count to telephony_campaigns
-    op.add_column("telephony_campaigns", sa.Column("skipped_count", sa.Integer(), nullable=False, server_default="0"))
+    with op.batch_alter_table("telephony_campaigns") as batch_op:
+        batch_op.add_column(sa.Column("skipped_count", sa.Integer(), nullable=False, server_default="0"))
 
     # 2. Create telephony_campaign_targets table
     op.create_table(
@@ -55,4 +56,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("telephony_campaign_targets")
-    op.drop_column("telephony_campaigns", "skipped_count")
+    with op.batch_alter_table("telephony_campaigns") as batch_op:
+        batch_op.drop_column("skipped_count")

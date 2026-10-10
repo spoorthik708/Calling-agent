@@ -81,15 +81,17 @@ def upgrade() -> None:
     op.create_index(op.f("ix_contact_list_memberships_contact_id"), "contact_list_memberships", ["contact_id"], unique=False)
 
     # 4. Add contact_list_id to telephony_campaigns
-    op.add_column("telephony_campaigns", sa.Column("contact_list_id", GUID(), nullable=True))
-    op.create_foreign_key("fk_telephony_campaigns_contact_list_id", "telephony_campaigns", "contact_lists", ["contact_list_id"], ["id"], ondelete="SET NULL")
-    op.create_index(op.f("ix_telephony_campaigns_contact_list_id"), "telephony_campaigns", ["contact_list_id"], unique=False)
+    with op.batch_alter_table("telephony_campaigns") as batch_op:
+        batch_op.add_column(sa.Column("contact_list_id", GUID(), nullable=True))
+        batch_op.create_foreign_key("fk_telephony_campaigns_contact_list_id", "contact_lists", ["contact_list_id"], ["id"], ondelete="SET NULL")
+        batch_op.create_index(op.f("ix_telephony_campaigns_contact_list_id"), ["contact_list_id"], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_telephony_campaigns_contact_list_id", "telephony_campaigns", type_="foreignkey")
-    op.drop_index(op.f("ix_telephony_campaigns_contact_list_id"), table_name="telephony_campaigns")
-    op.drop_column("telephony_campaigns", "contact_list_id")
+    with op.batch_alter_table("telephony_campaigns") as batch_op:
+        batch_op.drop_constraint("fk_telephony_campaigns_contact_list_id", type_="foreignkey")
+        batch_op.drop_index(op.f("ix_telephony_campaigns_contact_list_id"))
+        batch_op.drop_column("contact_list_id")
 
     op.drop_table("contact_list_memberships")
     op.drop_table("contact_lists")

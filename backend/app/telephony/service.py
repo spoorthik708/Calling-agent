@@ -18,6 +18,7 @@ from app.core.config import get_settings
 from app.core.exceptions import (
     AgentNotFoundError,
     CallSessionNotFoundError,
+    EntityNotFoundError,
     TelephonyPermissionError,
     TelephonyProviderError,
     TenantIsolationError,
