@@ -64,7 +64,8 @@ class CampaignCreateRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     agent_id: uuid.UUID
     from_phone: str
-    target_phones: List[str] = Field(..., min_length=1)
+    contact_list_id: Optional[uuid.UUID] = None
+    target_phones: List[str] = Field(default_factory=list)
     scheduled_at: Optional[datetime] = None
     custom_parameters: Dict[str, Any] = Field(default_factory=dict)
 
@@ -73,6 +74,7 @@ class CampaignResponse(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     agent_id: uuid.UUID
+    contact_list_id: Optional[uuid.UUID] = None
     name: str
     from_phone: str
     status: str

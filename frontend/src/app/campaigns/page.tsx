@@ -14,12 +14,14 @@ import {
   Clock,
   Play,
   Pause,
+  Folder,
 } from "lucide-react";
 
 interface Campaign {
   id: string;
   tenant_id: string;
   agent_id: string;
+  contact_list_id?: string;
   name: string;
   from_phone: string;
   status: string;
@@ -33,8 +35,15 @@ interface Campaign {
   created_at: string;
 }
 
+interface ContactList {
+  id: string;
+  name: string;
+  contact_count: number;
+}
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [contactLists, setContactLists] = useState<ContactList[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +56,7 @@ export default function CampaignsPage() {
     name: "",
     agent_id: "",
     from_phone: "+18005550199",
+    contact_list_id: "",
     target_phones_input: "",
     scheduled_at: "",
   });
@@ -68,8 +78,19 @@ export default function CampaignsPage() {
     }
   };
 
+  const fetchContactLists = async () => {
+    try {
+      const res = await fetch("/api/v1/contacts/lists");
+      if (res.ok) {
+        const data = await res.json();
+        setContactLists(data);
+      }
+    } catch (err) {}
+  };
+
   useEffect(() => {
     fetchCampaigns();
+    fetchContactLists();
   }, []);
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
@@ -81,8 +102,8 @@ export default function CampaignsPage() {
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
 
-    if (phones.length === 0) {
-      setError("Please provide at least one target phone number.");
+    if (!formData.contact_list_id && phones.length === 0) {
+      setError("Please select a saved Contact List or provide target phone numbers.");
       return;
     }
 
@@ -91,6 +112,7 @@ export default function CampaignsPage() {
         name: formData.name,
         agent_id: formData.agent_id || "11111111-1111-1111-1111-111111111111", // Default test agent UUID
         from_phone: formData.from_phone,
+        contact_list_id: formData.contact_list_id || null,
         target_phones: phones,
         scheduled_at: formData.scheduled_at ? new Date(formData.scheduled_at).toISOString() : null,
       };
@@ -111,6 +133,7 @@ export default function CampaignsPage() {
         name: "",
         agent_id: "",
         from_phone: "+18005550199",
+        contact_list_id: "",
         target_phones_input: "",
         scheduled_at: "",
       });
@@ -160,7 +183,7 @@ export default function CampaignsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-100">Calling Campaigns</h1>
             <p className="text-xs text-slate-400 mt-1">
-              Automated outbound calling campaigns, contact scheduling, and execution tracking.
+              Automated outbound calling campaigns, contact list selection, and opt-out enforcement.
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -312,18 +335,40 @@ export default function CampaignsPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Target Phone Numbers (One per line)
-                </label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="+15550101&#10;+15550102&#10;+15550103"
-                  value={formData.target_phones_input}
-                  onChange={(e) => setFormData({ ...formData, target_phones_input: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono focus:outline-none focus:border-purple-500"
-                />
+              {/* Target Selection: Saved Contact List or Custom Phone Input */}
+              <div className="space-y-3 pt-1 border-t border-slate-800">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Select Target Contact List (Recommended)
+                  </label>
+                  <select
+                    value={formData.contact_list_id}
+                    onChange={(e) => setFormData({ ...formData, contact_list_id: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">-- Or enter manual phone numbers below --</option>
+                    {contactLists.map((lst) => (
+                      <option key={lst.id} value={lst.id}>
+                        {lst.name} ({lst.contact_count} contacts)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {!formData.contact_list_id && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Manual Target Phone Numbers (One per line)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="+15550101&#10;+15550102&#10;+15550103"
+                      value={formData.target_phones_input}
+                      onChange={(e) => setFormData({ ...formData, target_phones_input: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end space-x-3 pt-2">

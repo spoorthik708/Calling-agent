@@ -70,6 +70,13 @@ class Permission(str, Enum):
     TELEPHONY_DISPATCH = "telephony:dispatch"
     TELEPHONY_MANAGE = "telephony:manage"
 
+    # Contacts & CSV Import permissions
+    CONTACTS_READ = "contacts:read"
+    CONTACTS_CREATE = "contacts:create"
+    CONTACTS_UPDATE = "contacts:update"
+    CONTACTS_DELETE = "contacts:delete"
+    CONTACTS_IMPORT = "contacts:import"
+
 
 # Definitive Role -> Permissions Mapping
 ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
@@ -114,6 +121,11 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.TELEPHONY_CREATE,
         Permission.TELEPHONY_DISPATCH,
         Permission.TELEPHONY_MANAGE,
+        Permission.CONTACTS_READ,
+        Permission.CONTACTS_CREATE,
+        Permission.CONTACTS_UPDATE,
+        Permission.CONTACTS_DELETE,
+        Permission.CONTACTS_IMPORT,
     }),
     Role.ADMIN: frozenset({
         Permission.TENANT_READ,
@@ -154,6 +166,11 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.TELEPHONY_CREATE,
         Permission.TELEPHONY_DISPATCH,
         Permission.TELEPHONY_MANAGE,
+        Permission.CONTACTS_READ,
+        Permission.CONTACTS_CREATE,
+        Permission.CONTACTS_UPDATE,
+        Permission.CONTACTS_DELETE,
+        Permission.CONTACTS_IMPORT,
     }),
     Role.MEMBER: frozenset({
         Permission.TENANT_READ,
@@ -174,6 +191,9 @@ ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
         Permission.TELEPHONY_READ,
         Permission.TELEPHONY_CREATE,
         Permission.TELEPHONY_DISPATCH,
+        Permission.CONTACTS_READ,
+        Permission.CONTACTS_CREATE,
+        Permission.CONTACTS_IMPORT,
     }),
 }
 

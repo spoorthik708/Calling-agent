@@ -325,11 +325,14 @@ class TelephonyService:
         agent_id: uuid.UUID,
         name: str,
         from_phone: str,
-        target_phones: List[str],
+        target_phones: Optional[List[str]] = None,
+        contact_list_id: Optional[uuid.UUID] = None,
         scheduled_at: Optional[datetime] = None,
         custom_parameters: Optional[Dict[str, Any]] = None,
     ) -> Any:
         from app.telephony.models import Campaign
+        from app.contacts.models import Contact, ContactList, ContactListMembership
+        from app.contacts.utils import normalize_phone_number
 
         agent_stmt = select(Agent).where(
             Agent.id == agent_id,
@@ -343,17 +346,66 @@ class TelephonyService:
                 details={"agent_id": str(agent_id)},
             )
 
+        resolved_target_phones: List[str] = []
+
+        # 1. Pull contacts from ContactList if specified
+        if contact_list_id:
+            c_list_stmt = select(ContactList).where(
+                ContactList.id == contact_list_id,
+                ContactList.tenant_id == tenant_id,
+            )
+            c_list = (await self.db.execute(c_list_stmt)).scalar_one_or_none()
+            if not c_list:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Specified contact list not found for tenant.",
+                )
+
+            # Join memberships and filter out opted-out/suppressed contacts
+            contacts_stmt = (
+                select(Contact.phone_number)
+                .join(ContactListMembership, ContactListMembership.contact_id == Contact.id)
+                .where(
+                    ContactListMembership.list_id == contact_list_id,
+                    Contact.tenant_id == tenant_id,
+                    Contact.consent_status == "opted_in",
+                )
+            )
+            res = await self.db.execute(contacts_stmt)
+            resolved_target_phones.extend(res.scalars().all())
+
+        # 2. Add raw target phones (excluding opted-out or suppressed ones)
+        if target_phones:
+            # Query suppressed phone numbers for tenant
+            suppressed_stmt = select(Contact.phone_number).where(
+                Contact.tenant_id == tenant_id,
+                Contact.consent_status.in_(["opted_out", "suppressed"]),
+            )
+            suppressed_phones = set((await self.db.execute(suppressed_stmt)).scalars().all())
+
+            for p in target_phones:
+                norm = normalize_phone_number(p)
+                if norm and norm not in suppressed_phones and norm not in resolved_target_phones:
+                    resolved_target_phones.append(norm)
+
+        if not resolved_target_phones:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No valid, opted-in target contacts found for campaign.",
+            )
+
         status_str = "scheduled" if scheduled_at else "running"
         now = datetime.now(timezone.utc)
         campaign = Campaign(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             agent_id=agent_id,
+            contact_list_id=contact_list_id,
             name=name,
             from_phone=from_phone,
             status=status_str,
-            target_phones=target_phones,
-            total_count=len(target_phones),
+            target_phones=resolved_target_phones,
+            total_count=len(resolved_target_phones),
             completed_count=0,
             failed_count=0,
             scheduled_at=scheduled_at,

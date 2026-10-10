@@ -149,6 +149,12 @@ class Campaign(Base, TenantAwareModel):
         nullable=False,
         index=True,
     )
+    contact_list_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contact_lists.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,

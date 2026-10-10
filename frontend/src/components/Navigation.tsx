@@ -3,13 +3,14 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PhoneCall, Megaphone, BarChart3, LayoutDashboard } from "lucide-react";
+import { PhoneCall, Megaphone, BarChart3, LayoutDashboard, Users } from "lucide-react";
 
 export function Navigation() {
   const pathname = usePathname();
 
   const navItems = [
     { name: "Overview", href: "/", icon: LayoutDashboard },
+    { name: "Contacts", href: "/contacts", icon: Users },
     { name: "Call History", href: "/calls", icon: PhoneCall },
     { name: "Campaigns", href: "/campaigns", icon: Megaphone },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },

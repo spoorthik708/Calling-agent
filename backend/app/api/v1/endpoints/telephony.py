@@ -213,6 +213,7 @@ async def create_campaign(
         name=request.name,
         from_phone=request.from_phone,
         target_phones=request.target_phones,
+        contact_list_id=request.contact_list_id,
         scheduled_at=request.scheduled_at,
         custom_parameters=request.custom_parameters,
     )
