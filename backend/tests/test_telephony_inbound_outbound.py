@@ -217,3 +217,65 @@ async def test_telephony_analytics(async_client: AsyncClient, telephony_setup):
     assert "outbound_calls" in data
     assert "completed_calls" in data
     assert "average_duration_seconds" in data
+
+
+def test_twilio_signature_verification_algorithm():
+    """Verifies authentic Twilio URL + POST-params HMAC-SHA1 signature verification."""
+    from app.telephony.provider import TwilioTelephonyProvider
+
+    provider = TwilioTelephonyProvider(auth_token="1234567890abcdef")
+    url = "https://mycompany.com/api/v1/telephony/inbound/webhook"
+    params = {
+        "CallSid": "CA123456789",
+        "From": "+15550100",
+        "To": "+18005550199",
+    }
+
+    # Compute expected signature for test
+    import hmac, hashlib, base64
+    s = url
+    for key in sorted(params.keys()):
+        s += f"{key}{params[key]}"
+    mac = hmac.new(b"1234567890abcdef", s.encode("utf-8"), hashlib.sha1).digest()
+    valid_signature = base64.b64encode(mac).decode("utf-8")
+
+    # Verify valid signature returns True
+    assert provider.verify_twilio_signature(url, params, valid_signature, "1234567890abcdef") is True
+
+    # Verify invalid signature returns False
+    assert provider.verify_twilio_signature(url, params, "invalid_sig", "1234567890abcdef") is False
+
+
+@pytest.mark.asyncio
+async def test_twilio_voice_transport_media_and_clear_events():
+    """Verifies TwilioVoiceTransport formats media frames and clear buffer instructions."""
+    from app.voice.transport import TwilioVoiceTransport
+    from app.voice.tts import TTSAudioChunk
+
+    class MockWS:
+        def __init__(self):
+            self.sent_messages = []
+        async def send_text(self, text: str):
+            self.sent_messages.append(text)
+
+    mock_ws = MockWS()
+    transport = TwilioVoiceTransport(mock_ws, stream_sid="MZ12345")
+
+    # 1. Send audio chunk
+    chunk = TTSAudioChunk(
+        audio_bytes=b"\x00\x01" * 80,
+        sample_rate=16000,
+        generation_id=1,
+        voice_session_id="test_sess",
+    )
+    await transport.send_audio(chunk)
+    assert len(mock_ws.sent_messages) == 1
+    assert "media" in mock_ws.sent_messages[0]
+    assert "MZ12345" in mock_ws.sent_messages[0]
+
+    # 2. Send barge-in interruption clear event
+    await transport.send_event("interrupted", {})
+    assert len(mock_ws.sent_messages) == 2
+    assert "clear" in mock_ws.sent_messages[1]
+    assert "MZ12345" in mock_ws.sent_messages[1]
+

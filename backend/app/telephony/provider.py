@@ -74,8 +74,7 @@ class TwilioTelephonyProvider(TelephonyProviderInterface):
         secret: str,
     ) -> bool:
         """
-        Validates incoming webhook authenticity to prevent spoofed calls.
-        Uses HMAC-SHA256 signature verification.
+        Generic HMAC-SHA256 signature verification fallback for raw payloads.
         """
         if not signature_header or not secret:
             return False
@@ -90,6 +89,39 @@ class TwilioTelephonyProvider(TelephonyProviderInterface):
             return hmac.compare_digest(signature_header.strip(), expected_sig)
         except Exception as exc:
             logger.warning("Error verifying webhook signature: %s", exc)
+            return False
+
+    def verify_twilio_signature(
+        self,
+        url: str,
+        params: Dict[str, Any],
+        signature_header: str,
+        auth_token: Optional[str] = None,
+    ) -> bool:
+        """
+        Validates Twilio webhook requests according to Twilio's official security specification:
+        1. Take full request URL (e.g. https://domain.com/api/v1/telephony/inbound/webhook).
+        2. Sort POST parameters alphabetically by key name.
+        3. Append each key and value to URL without delimiters.
+        4. Compute HMAC-SHA1 using Twilio auth_token.
+        5. Base64 encode signature digest and compare with X-Twilio-Signature header.
+        """
+        token = auth_token or self.auth_token
+        if not signature_header or not token:
+            return False
+
+        try:
+            s = url
+            if params:
+                for key in sorted(params.keys()):
+                    val = str(params[key])
+                    s += f"{key}{val}"
+
+            mac = hmac.new(token.encode("utf-8"), s.encode("utf-8"), hashlib.sha1).digest()
+            computed_sig = base64.b64encode(mac).decode("utf-8")
+            return hmac.compare_digest(signature_header.strip(), computed_sig)
+        except Exception as exc:
+            logger.warning("Error verifying Twilio request signature: %s", exc)
             return False
 
 

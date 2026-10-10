@@ -288,3 +288,70 @@ async def end_voice_session(
         return VoiceSessionResponse.model_validate(session)
     except Exception as exc:
         raise http_exception_from_domain(exc)
+
+
+from fastapi import WebSocket, WebSocketDisconnect
+from app.voice.transport import TwilioVoiceTransport
+
+@router.websocket("/stream")
+async def voice_websocket_stream(
+    websocket: WebSocket,
+    session_id: uuid.UUID = Query(...),
+    tenant_id: uuid.UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Real-Time WebSocket Audio Streaming Endpoint.
+    Connects Twilio Media Streams and browser audio streams to VoicePipelineService.
+    """
+    await websocket.accept()
+    transport = TwilioVoiceTransport(websocket)
+    pipeline = VoicePipelineService(db)
+
+    try:
+        await pipeline.start_session(session_id, tenant_id, transport=transport)
+        seq = 0
+
+        while True:
+            msg = await websocket.receive()
+            if "text" in msg and msg["text"]:
+                import json
+                try:
+                    data = json.loads(msg["text"])
+                    event_type = data.get("event")
+
+                    if event_type == "start":
+                        stream_sid = data.get("start", {}).get("streamSid") or data.get("streamSid")
+                        if stream_sid:
+                            transport.set_stream_sid(stream_sid)
+                    elif event_type == "media":
+                        payload_b64 = data.get("media", {}).get("payload", "")
+                        if payload_b64:
+                            import base64
+                            audio_bytes = base64.b64decode(payload_b64)
+                            frame = AudioFrame(payload=audio_bytes, sequence=seq)
+                            seq += 1
+                            await pipeline.ingest_audio(session_id=session_id, tenant_id=tenant_id, frame=frame)
+                    elif event_type in ("stop", "end"):
+                        await pipeline.end_session(session_id=session_id, tenant_id=tenant_id, reason="stream_stop")
+                        break
+                except Exception as parse_err:
+                    logger.warning("Error processing WS text event: %s", parse_err)
+
+            elif "bytes" in msg and msg["bytes"]:
+                frame = AudioFrame(payload=msg["bytes"], sequence=seq)
+                seq += 1
+                await pipeline.ingest_audio(session_id=session_id, tenant_id=tenant_id, frame=frame)
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected for session %s", session_id)
+        try:
+            await pipeline.end_session(session_id=session_id, tenant_id=tenant_id, reason="ws_disconnect")
+        except Exception:
+            pass
+    except Exception as exc:
+        logger.error("Error in voice_websocket_stream: %s", exc, exc_info=True)
+        try:
+            await pipeline.end_session(session_id=session_id, tenant_id=tenant_id, reason="ws_error")
+        except Exception:
+            pass
