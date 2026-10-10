@@ -127,3 +127,92 @@ class CallSession(Base, TenantAwareModel):
         Index("ix_call_sessions_tenant_status", "tenant_id", "status"),
         Index("ix_call_sessions_tenant_created", "tenant_id", "created_at"),
     )
+
+
+class Campaign(Base, TenantAwareModel):
+    """
+    Campaign model representing automated outbound calling campaigns.
+    Tracks target phone contact lists, agent assignments, schedule, progress,
+    and completion status.
+    """
+
+    __tablename__ = "telephony_campaigns"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+    from_phone: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default="draft",
+        nullable=False,
+        index=True,
+    )
+    target_phones: Mapped[Dict[str, Any]] = mapped_column(
+        JSONB if hasattr(JSONB, "as_generic") else JSONB,
+        default=list,
+        nullable=False,
+    )
+    completed_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    failed_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    total_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    scheduled_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    ended_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    custom_parameters: Mapped[Dict[str, Any]] = mapped_column(
+        JSONB if hasattr(JSONB, "as_generic") else JSONB,
+        default=dict,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_telephony_campaigns_tenant_status", "tenant_id", "status"),
+        Index("ix_telephony_campaigns_tenant_created", "tenant_id", "created_at"),
+    )

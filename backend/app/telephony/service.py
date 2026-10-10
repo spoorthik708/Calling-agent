@@ -319,6 +319,100 @@ class TelephonyService:
         await self.db.refresh(call)
         return call
 
+    async def create_campaign(
+        self,
+        tenant_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        name: str,
+        from_phone: str,
+        target_phones: List[str],
+        scheduled_at: Optional[datetime] = None,
+        custom_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        from app.telephony.models import Campaign
+
+        agent_stmt = select(Agent).where(
+            Agent.id == agent_id,
+            Agent.tenant_id == tenant_id,
+            Agent.status == AgentStatus.ACTIVE.value,
+        )
+        agent = (await self.db.execute(agent_stmt)).scalar_one_or_none()
+        if not agent:
+            raise AgentNotFoundError(
+                message=f"Active agent {agent_id} not found for tenant.",
+                details={"agent_id": str(agent_id)},
+            )
+
+        status_str = "scheduled" if scheduled_at else "running"
+        now = datetime.now(timezone.utc)
+        campaign = Campaign(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            name=name,
+            from_phone=from_phone,
+            status=status_str,
+            target_phones=target_phones,
+            total_count=len(target_phones),
+            completed_count=0,
+            failed_count=0,
+            scheduled_at=scheduled_at,
+            started_at=None if scheduled_at else now,
+            custom_parameters=custom_parameters or {},
+        )
+        self.db.add(campaign)
+        await self.db.commit()
+        await self.db.refresh(campaign)
+        return campaign
+
+    async def list_campaigns(
+        self,
+        tenant_id: uuid.UUID,
+        status: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Any]:
+        from app.telephony.models import Campaign
+
+        stmt = select(Campaign).where(Campaign.tenant_id == tenant_id)
+        if status:
+            stmt = stmt.where(Campaign.status == status)
+
+        stmt = stmt.order_by(Campaign.created_at.desc()).offset(offset).limit(limit)
+        results = await self.db.execute(stmt)
+        return list(results.scalars().all())
+
+    async def get_campaign(
+        self,
+        campaign_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+    ) -> Any:
+        from app.telephony.models import Campaign
+
+        stmt = select(Campaign).where(
+            Campaign.id == campaign_id,
+            Campaign.tenant_id == tenant_id,
+        )
+        campaign = (await self.db.execute(stmt)).scalar_one_or_none()
+        if not campaign:
+            raise EntityNotFoundError(
+                message=f"Campaign {campaign_id} not found for tenant.",
+                details={"campaign_id": str(campaign_id)},
+            )
+        return campaign
+
+    async def cancel_campaign(
+        self,
+        campaign_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+    ) -> Any:
+        campaign = await self.get_campaign(campaign_id, tenant_id)
+        campaign.status = "cancelled"
+        campaign.ended_at = datetime.now(timezone.utc)
+        await self.db.commit()
+        await self.db.refresh(campaign)
+        return campaign
+
     async def list_calls(
         self,
         tenant_id: uuid.UUID,

@@ -190,3 +190,85 @@ async def get_telephony_analytics(
         total_duration_seconds=total_duration,
         average_duration_seconds=round(avg_duration, 2),
     )
+
+
+from app.telephony.schemas import CampaignCreateRequest, CampaignResponse
+
+@router.post(
+    "/campaigns",
+    response_model=CampaignResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Calling Campaign",
+    description="Creates and schedules an automated outbound calling campaign for a target contact list.",
+)
+async def create_campaign(
+    request: CampaignCreateRequest,
+    current_user: User = Depends(require_permission(Permission.TELEPHONY_DISPATCH.value)),
+    db: AsyncSession = Depends(get_db),
+) -> CampaignResponse:
+    service = TelephonyService(db)
+    campaign = await service.create_campaign(
+        tenant_id=current_user.tenant_id,
+        agent_id=request.agent_id,
+        name=request.name,
+        from_phone=request.from_phone,
+        target_phones=request.target_phones,
+        scheduled_at=request.scheduled_at,
+        custom_parameters=request.custom_parameters,
+    )
+    return CampaignResponse.model_validate(campaign, from_attributes=True)
+
+
+@router.get(
+    "/campaigns",
+    response_model=List[CampaignResponse],
+    summary="List Campaigns",
+    description="Lists calling campaigns for the active tenant.",
+)
+async def list_campaigns(
+    status: Optional[str] = Query(None, description="Filter by status (scheduled, running, completed, cancelled)"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> List[CampaignResponse]:
+    service = TelephonyService(db)
+    campaigns = await service.list_campaigns(
+        tenant_id=current_user.tenant_id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+    return [CampaignResponse.model_validate(c, from_attributes=True) for c in campaigns]
+
+
+@router.get(
+    "/campaigns/{campaign_id}",
+    response_model=CampaignResponse,
+    summary="Get Campaign Details",
+    description="Retrieves a specific calling campaign by ID with tenant isolation.",
+)
+async def get_campaign(
+    campaign_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CampaignResponse:
+    service = TelephonyService(db)
+    campaign = await service.get_campaign(campaign_id, current_user.tenant_id)
+    return CampaignResponse.model_validate(campaign, from_attributes=True)
+
+
+@router.post(
+    "/campaigns/{campaign_id}/cancel",
+    response_model=CampaignResponse,
+    summary="Cancel Campaign",
+    description="Cancels an active or scheduled calling campaign.",
+)
+async def cancel_campaign(
+    campaign_id: uuid.UUID,
+    current_user: User = Depends(require_permission(Permission.TELEPHONY_DISPATCH.value)),
+    db: AsyncSession = Depends(get_db),
+) -> CampaignResponse:
+    service = TelephonyService(db)
+    campaign = await service.cancel_campaign(campaign_id, current_user.tenant_id)
+    return CampaignResponse.model_validate(campaign, from_attributes=True)

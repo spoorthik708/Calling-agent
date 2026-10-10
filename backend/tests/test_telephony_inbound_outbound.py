@@ -279,3 +279,43 @@ async def test_twilio_voice_transport_media_and_clear_events():
     assert "clear" in mock_ws.sent_messages[1]
     assert "MZ12345" in mock_ws.sent_messages[1]
 
+
+@pytest.mark.asyncio
+async def test_telephony_campaign_crud_flow(async_client: AsyncClient, telephony_setup):
+    """Verifies creation, listing, details, and cancellation of calling campaigns."""
+    tenant = telephony_setup["tenant_a"]
+    user = telephony_setup["user_a"]
+    agent = telephony_setup["agent_a"]
+
+    token = create_access_token(subject=user.id, tenant_id=tenant.id, role=user.role)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    payload = {
+        "name": "Q4 Outreach Campaign",
+        "agent_id": str(agent.id),
+        "from_phone": "+18005550199",
+        "target_phones": ["+15550101", "+15550102", "+15550103"],
+        "custom_parameters": {"sector": "education"},
+    }
+
+    # 1. Create Campaign
+    create_res = await async_client.post("/api/v1/telephony/campaigns", headers=headers, json=payload)
+    assert create_res.status_code == 201
+    camp_data = create_res.json()
+    camp_id = camp_data["id"]
+
+    assert camp_data["name"] == "Q4 Outreach Campaign"
+    assert camp_data["total_count"] == 3
+    assert camp_data["status"] == "running"
+
+    # 2. List Campaigns
+    list_res = await async_client.get("/api/v1/telephony/campaigns", headers=headers)
+    assert list_res.status_code == 200
+    camps = list_res.json()
+    assert len(camps) >= 1
+
+    # 3. Cancel Campaign
+    cancel_res = await async_client.post(f"/api/v1/telephony/campaigns/{camp_id}/cancel", headers=headers)
+    assert cancel_res.status_code == 200
+    assert cancel_res.json()["status"] == "cancelled"
+

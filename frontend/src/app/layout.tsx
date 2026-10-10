@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "YAVURA | Enterprise AI Conversational Agents",
+  title: "Telephony & AI Voice Agent Platform",
   description: "Enterprise SaaS platform for deploying verified, real-time AI conversational voice agents.",
 };
 

@@ -32,7 +32,7 @@ from app.tools.models import (
 )
 from app.voice.models import VoiceSession
 from app.voice.state import VoiceSessionStatus
-from app.telephony.models import CallSession
+from app.telephony.models import CallSession, Campaign
 
 __all__ = [
     "Base",
@@ -65,4 +65,5 @@ __all__ = [
     "VoiceSession",
     "VoiceSessionStatus",
     "CallSession",
+    "Campaign",
 ]

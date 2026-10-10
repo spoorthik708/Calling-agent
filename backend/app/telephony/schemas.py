@@ -69,6 +69,24 @@ class CampaignCreateRequest(BaseModel):
     custom_parameters: Dict[str, Any] = Field(default_factory=dict)
 
 
+class CampaignResponse(BaseModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    agent_id: uuid.UUID
+    name: str
+    from_phone: str
+    status: str
+    target_phones: List[str]
+    completed_count: int
+    failed_count: int
+    total_count: int
+    scheduled_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class TelephonyAnalyticsResponse(BaseModel):
     total_calls: int
     inbound_calls: int
